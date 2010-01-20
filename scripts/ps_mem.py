@@ -35,6 +35,10 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
+# V2.0      15 Jan 2010     From a report by Brock Noland <brockn@gmail.com>
+#                           about overreporting of RAM usage of his java progs,
+#                           handle linux clones that have pids. I.E. that have
+#                           CLONE_VM specified without CLONE_THREAD.
 
 # Notes:
 #
@@ -57,11 +61,25 @@
 # Since kernel 2.6.23-rc8-mm1 PSS is available in smaps, which allows
 # us to calculate a more accurate value for the total RAM used by programs.
 #
+# Programs that use CLONE_VM without CLONE_THREAD are discounted by assuming
+# they're the only programs that have the same /proc/$PID/smaps file for
+# each instance.  This will fail if there are multiple real instances of a
+# program that then use CLONE_VM without CLONE_THREAD, or if a clone changes
+# its memory map while we're checksumming each /proc/$PID/smaps.
+#
 # I don't take account of memory allocated for a program
 # by other programs. For e.g. memory used in the X server for
 # a program could be determined, but is not.
 
 import sys, os, string
+try:
+    # md5 module is deprecated on python 2.6
+    # so try the newer hashlib first
+    import hashlib
+    md5_new = hashlib.md5
+except ImportError:
+    import md5
+    md5_new = md5.new
 
 if os.geteuid() != 0:
     sys.stderr.write("Sorry, root permission required.\n");
@@ -85,12 +103,17 @@ have_pss=0
 #Note shared is always a subset of rss (trs is not always)
 def getMemStats(pid):
     global have_pss
+    mem_id = pid #unique
     Private_lines=[]
     Shared_lines=[]
     Pss_lines=[]
     Rss=int(open("/proc/"+str(pid)+"/statm").readline().split()[1])*PAGESIZE
     if os.path.exists("/proc/"+str(pid)+"/smaps"): #stat
+        digester = md5_new()
         for line in open("/proc/"+str(pid)+"/smaps").readlines(): #open
+            # Note we checksum smaps as maps is usually but
+            # not always different for separate processes.
+            digester.update(line)
             if line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
@@ -98,6 +121,7 @@ def getMemStats(pid):
             elif line.startswith("Pss"):
                 have_pss=1
                 Pss_lines.append(line)
+        mem_id = digester.hexdigest()
         Shared=sum([int(line.split()[1]) for line in Shared_lines])
         Private=sum([int(line.split()[1]) for line in Private_lines])
         #Note Shared + Private = Rss above
@@ -113,7 +137,7 @@ def getMemStats(pid):
         Shared=int(open("/proc/"+str(pid)+"/statm").readline().split()[2])
         Shared*=PAGESIZE
         Private = Rss - Shared
-    return (Private, Shared)
+    return (Private, Shared, mem_id)
 
 def getCmdName(pid):
     cmd = file("/proc/%d/status" % pid).readline()[6:-1]
@@ -128,6 +152,7 @@ def getCmdName(pid):
 
 cmds={}
 shareds={}
+mem_ids={}
 count={}
 for pid in os.listdir("/proc/"):
     try:
@@ -143,7 +168,7 @@ for pid in os.listdir("/proc/"):
         #process gone
         continue
     try:
-        private, shared = getMemStats(pid)
+        private, shared, mem_id = getMemStats(pid)
     except:
         continue #process gone
     if shareds.get(cmd):
@@ -158,10 +183,18 @@ for pid in os.listdir("/proc/"):
        count[cmd] += 1
     else:
        count[cmd] = 1
+    mem_ids.setdefault(cmd,{}).update({mem_id:None})
 
 #Add shared mem for each program
 total=0
 for cmd in cmds.keys():
+    cmd_count = count[cmd]
+    if len(mem_ids[cmd]) == 1 and cmd_count > 1:
+        # Assume this program is using CLONE_CM without CLONE_THREAD
+        # so only account for one of the processes
+        cmds[cmd] /= cmd_count
+        if have_pss:
+            shareds[cmd] /= cmd_count
     cmds[cmd]=cmds[cmd]+shareds[cmd]
     total+=cmds[cmd] #valid if PSS available
 
