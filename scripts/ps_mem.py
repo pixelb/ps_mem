@@ -39,6 +39,8 @@
 #                           about overreporting of RAM usage of his java progs,
 #                           handle linux clones that have pids. I.E. that have
 #                           CLONE_VM specified without CLONE_THREAD.
+# V2.1      20 Jan 2010     Append [deleted] or [updated] to programs which are
+#                           no longer on disk or have a new version available.
 
 # Notes:
 #
@@ -140,8 +142,24 @@ def getMemStats(pid):
     return (Private, Shared, mem_id)
 
 def getCmdName(pid):
+    cmdline = file("/proc/%d/cmdline" % pid).read().split("\0")
+    if cmdline[-1] == '' and len(cmdline) > 1:
+        cmdline = cmdline[:-1]
+    path = os.path.realpath("/proc/%d/exe" % pid)
+    if path.endswith(" (deleted)"):
+        path = path[:-10]
+        if os.path.exists(path):
+            path += " [updated]"
+        else:
+            #The path could be have prelink stuff so try cmdline
+            #which might have the full path present. This helped for:
+            #/usr/libexec/notification-area-applet.#prelink#.fX7LCT (deleted)
+            if os.path.exists(cmdline[0]):
+                path = cmdline[0] + " [updated]"
+            else:
+                path += " [deleted]"
+    exe = os.path.basename(path)
     cmd = file("/proc/%d/status" % pid).readline()[6:-1]
-    exe = os.path.basename(os.path.realpath("/proc/%d/exe" % pid))
     if exe.startswith(cmd):
         cmd=exe #show non truncated version
         #Note because we show the non truncated name
