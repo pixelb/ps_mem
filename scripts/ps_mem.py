@@ -41,6 +41,10 @@
 #                           CLONE_VM specified without CLONE_THREAD.
 # V2.1      20 Jan 2010     Append [deleted] or [updated] to programs which are
 #                           no longer on disk or have a new version available.
+#                           Add a --split-args option to group programs based
+#                           on the full command line, which could be used
+#                           to monitor separate "pmon" processes for example:
+#                             ps_mem.py | grep [p]mon
 
 # Notes:
 #
@@ -48,7 +52,7 @@
 # by the shell or with env, will be merged to the interpreter
 # (as that's what's given to exec). For e.g. all python programs
 # starting with "#!/usr/bin/env python" will be grouped under python.
-# You can change this by changing comm= to args= below but that will
+# You can change this by using the full command line but that will
 # have the undesirable affect of splitting up programs started with
 # differing parameters (for e.g. mingetty tty[1-6]).
 #
@@ -86,6 +90,10 @@ except ImportError:
 if os.geteuid() != 0:
     sys.stderr.write("Sorry, root permission required.\n");
     sys.exit(1)
+
+split_args=False
+if len(sys.argv)==2 and sys.argv[1] == "--split-args":
+    split_args = True
 
 PAGESIZE=os.sysconf("SC_PAGE_SIZE")/1024 #KiB
 our_pid=os.getpid()
@@ -145,7 +153,9 @@ def getCmdName(pid):
     cmdline = file("/proc/%d/cmdline" % pid).read().split("\0")
     if cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
-    path = os.path.realpath("/proc/%d/exe" % pid)
+    path = os.path.realpath("/proc/%d/exe" % pid) #exception for kernel threads
+    if split_args:
+        return " ".join(cmdline)
     if path.endswith(" (deleted)"):
         path = path[:-10]
         if os.path.exists(path):
