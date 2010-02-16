@@ -45,6 +45,8 @@
 #                           on the full command line, which could be used
 #                           to monitor separate "pmon" processes for example:
 #                             ps_mem.py | grep [p]mon
+# V2.2      16 Feb 2010     Support python 3.
+#                           Patch from Brian Harring <ferringb@gmail.com>
 
 # Notes:
 #
@@ -100,7 +102,7 @@ our_pid=os.getpid()
 
 #(major,minor,release)
 def kernel_ver():
-    kv=open("/proc/sys/kernel/osrelease").readline().split(".")[:3]
+    kv=open("/proc/sys/kernel/osrelease", "rt").readline().split(".")[:3]
     for char in "-_":
         kv[2]=kv[2].split(char)[0]
     return (int(kv[0]), int(kv[1]), int(kv[2]))
@@ -117,13 +119,14 @@ def getMemStats(pid):
     Private_lines=[]
     Shared_lines=[]
     Pss_lines=[]
-    Rss=int(open("/proc/"+str(pid)+"/statm").readline().split()[1])*PAGESIZE
+    Rss=int(open("/proc/"+str(pid)+"/statm", "rt").readline().split()[1])*PAGESIZE
     if os.path.exists("/proc/"+str(pid)+"/smaps"): #stat
         digester = md5_new()
-        for line in open("/proc/"+str(pid)+"/smaps").readlines(): #open
+        for line in open("/proc/"+str(pid)+"/smaps", "rb").readlines(): #open
             # Note we checksum smaps as maps is usually but
             # not always different for separate processes.
             digester.update(line)
+            line = line.decode("ascii")
             if line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
@@ -144,13 +147,13 @@ def getMemStats(pid):
         Shared=0 #lots of overestimation, but what can we do?
         Private = Rss
     else:
-        Shared=int(open("/proc/"+str(pid)+"/statm").readline().split()[2])
+        Shared=int(open("/proc/"+str(pid)+"/statm", "rt").readline().split()[2])
         Shared*=PAGESIZE
         Private = Rss - Shared
     return (Private, Shared, mem_id)
 
 def getCmdName(pid):
-    cmdline = file("/proc/%d/cmdline" % pid).read().split("\0")
+    cmdline = open("/proc/%d/cmdline" % pid, "rt").read().split("\0")
     if cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
     path = os.path.realpath("/proc/%d/exe" % pid) #exception for kernel threads
@@ -169,7 +172,7 @@ def getCmdName(pid):
             else:
                 path += " [deleted]"
     exe = os.path.basename(path)
-    cmd = file("/proc/%d/status" % pid).readline()[6:-1]
+    cmd = open("/proc/%d/status" % pid, "rt").readline()[6:-1]
     if exe.startswith(cmd):
         cmd=exe #show non truncated version
         #Note because we show the non truncated name
@@ -183,10 +186,10 @@ shareds={}
 mem_ids={}
 count={}
 for pid in os.listdir("/proc/"):
-    try:
-        pid = int(pid) #note Thread IDs not listed in /proc/ which is good
-        if pid == our_pid: continue
-    except:
+    if not pid.isdigit():
+        continue
+    pid = int(pid)
+    if pid == our_pid:
         continue
     try:
         cmd = getCmdName(pid)
@@ -207,7 +210,7 @@ for pid in os.listdir("/proc/"):
     else:
         shareds[cmd]=shared
     cmds[cmd]=cmds.setdefault(cmd,0)+private
-    if count.has_key(cmd):
+    if cmd in count:
        count[cmd] += 1
     else:
        count[cmd] = 1
@@ -215,7 +218,7 @@ for pid in os.listdir("/proc/"):
 
 #Add shared mem for each program
 total=0
-for cmd in cmds.keys():
+for cmd in cmds:
     cmd_count = count[cmd]
     if len(mem_ids[cmd]) == 1 and cmd_count > 1:
         # Assume this program is using CLONE_CM without CLONE_THREAD
@@ -226,9 +229,13 @@ for cmd in cmds.keys():
     cmds[cmd]=cmds[cmd]+shareds[cmd]
     total+=cmds[cmd] #valid if PSS available
 
-sort_list = cmds.items()
-sort_list.sort(lambda x,y:cmp(x[1],y[1]))
-sort_list=filter(lambda x:x[1],sort_list) #get rid of zero sized processes
+if sys.version_info >= (2, 6):
+    sort_list = sorted(cmds.items(), key=lambda x:x[1])
+else:
+    sort_list = cmds.items()
+    sort_list.sort(lambda x,y:cmp(x[1],y[1]))
+# list wrapping is redundant on <py3k, needed for >=pyk3 however
+sort_list=list(filter(lambda x:x[1],sort_list)) #get rid of zero sized processes
 
 #The following matches "du -h" output
 #see also human.py
@@ -245,16 +252,15 @@ def cmd_with_count(cmd, count):
     else:
        return cmd
 
-print " Private  +   Shared  =  RAM used\tProgram \n"
+sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram \n\n")
 for cmd in sort_list:
-    print "%8sB + %8sB = %8sB\t%s" % (human(cmd[1]-shareds[cmd[0]]),
+    sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" % (human(cmd[1]-shareds[cmd[0]]),
                                       human(shareds[cmd[0]]), human(cmd[1]),
-                                      cmd_with_count(cmd[0], count[cmd[0]]))
+                                      cmd_with_count(cmd[0], count[cmd[0]])))
 if have_pss:
-    print "-" * 33
-    print " " * 24 + "%8sB" % human(total)
-    print "=" * 33
-print "\n Private  +   Shared  =  RAM used\tProgram \n"
+    sys.stdout.write("%s\n%s%8sB\n%s\n" % ("-" * 33,
+        " " * 24, human(total), "=" * 33))
+sys.stdout.write("\n Private  +   Shared  =  RAM used\tProgram \n\n")
 
 #Warn of possible inaccuracies
 #2 = accurate & can total
@@ -264,12 +270,12 @@ print "\n Private  +   Shared  =  RAM used\tProgram \n"
 def shared_val_accuracy():
     """http://wiki.apache.org/spamassassin/TopSharedMemoryBug"""
     if kv[:2] == (2,4):
-        if open("/proc/meminfo").read().find("Inact_") == -1:
+        if open("/proc/meminfo", "rt").read().find("Inact_") == -1:
             return 1
         return 0
     elif kv[:2] == (2,6):
         if os.path.exists("/proc/"+str(os.getpid())+"/smaps"):
-            if open("/proc/"+str(os.getpid())+"/smaps").read().find("Pss:")!=-1:
+            if open("/proc/"+str(os.getpid())+"/smaps", "rt").read().find("Pss:")!=-1:
                 return 2
             else:
                 return 1
