@@ -221,7 +221,7 @@ total=0
 for cmd in cmds:
     cmd_count = count[cmd]
     if len(mem_ids[cmd]) == 1 and cmd_count > 1:
-        # Assume this program is using CLONE_CM without CLONE_THREAD
+        # Assume this program is using CLONE_VM without CLONE_THREAD
         # so only account for one of the processes
         cmds[cmd] /= cmd_count
         if have_pss:
