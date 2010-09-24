@@ -47,6 +47,8 @@
 #                             ps_mem.py | grep [p]mon
 # V2.2      16 Feb 2010     Support python 3.
 #                           Patch from Brian Harring <ferringb@gmail.com>
+# V2.3      24 Sep 2010     Allow use as python module.
+#                           Patch from Tim Kersten <tim@io41.com>
 
 # Notes:
 #
@@ -91,7 +93,8 @@ except ImportError:
 
 if os.geteuid() != 0:
     sys.stderr.write("Sorry, root permission required.\n");
-    sys.exit(1)
+    if __name__ == '__main__':
+        sys.exit(1)
 
 split_args=False
 if len(sys.argv)==2 and sys.argv[1] == "--split-args":
@@ -252,15 +255,16 @@ def cmd_with_count(cmd, count):
     else:
        return cmd
 
-sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram \n\n")
-for cmd in sort_list:
-    sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" % (human(cmd[1]-shareds[cmd[0]]),
-                                      human(shareds[cmd[0]]), human(cmd[1]),
-                                      cmd_with_count(cmd[0], count[cmd[0]])))
-if have_pss:
-    sys.stdout.write("%s\n%s%8sB\n%s\n" % ("-" * 33,
-        " " * 24, human(total), "=" * 33))
-sys.stdout.write("\n Private  +   Shared  =  RAM used\tProgram \n\n")
+if __name__ == '__main__':
+    sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram \n\n")
+    for cmd in sort_list:
+        sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" % (human(cmd[1]-shareds[cmd[0]]),
+                                        human(shareds[cmd[0]]), human(cmd[1]),
+                                        cmd_with_count(cmd[0], count[cmd[0]])))
+    if have_pss:
+        sys.stdout.write("%s\n%s%8sB\n%s\n" % ("-" * 33,
+            " " * 24, human(total), "=" * 33))
+    sys.stdout.write("\n Private  +   Shared  =  RAM used\tProgram \n\n")
 
 #Warn of possible inaccuracies
 #2 = accurate & can total
@@ -285,23 +289,24 @@ def shared_val_accuracy():
     else:
         return 1
 
-vm_accuracy = shared_val_accuracy()
-if vm_accuracy == -1:
-    sys.stderr.write(
-     "Warning: Shared memory is not reported by this system.\n"
-    )
-    sys.stderr.write(
-     "Values reported will be too large, and totals are not reported\n"
-    )
-elif vm_accuracy == 0:
-    sys.stderr.write(
-     "Warning: Shared memory is not reported accurately by this system.\n"
-    )
-    sys.stderr.write(
-     "Values reported could be too large, and totals are not reported\n"
-    )
-elif vm_accuracy == 1:
-    sys.stderr.write(
-     "Warning: Shared memory is slightly over-estimated by this system\n"
-     "for each program, so totals are not reported.\n"
-    )
+if __name__ == '__main__':
+    vm_accuracy = shared_val_accuracy()
+    if vm_accuracy == -1:
+        sys.stderr.write(
+         "Warning: Shared memory is not reported by this system.\n"
+        )
+        sys.stderr.write(
+         "Values reported will be too large, and totals are not reported\n"
+        )
+    elif vm_accuracy == 0:
+        sys.stderr.write(
+         "Warning: Shared memory is not reported accurately by this system.\n"
+        )
+        sys.stderr.write(
+         "Values reported could be too large, and totals are not reported\n"
+        )
+    elif vm_accuracy == 1:
+        sys.stderr.write(
+         "Warning: Shared memory is slightly over-estimated by this system\n"
+         "for each program, so totals are not reported.\n"
+        )
