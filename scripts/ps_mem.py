@@ -35,20 +35,8 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V2.0      15 Jan 2010     From a report by Brock Noland <brockn@gmail.com>
-#                           about overreporting of RAM usage of his java progs,
-#                           handle linux clones that have pids. I.E. that have
-#                           CLONE_VM specified without CLONE_THREAD.
-# V2.1      20 Jan 2010     Append [deleted] or [updated] to programs which are
-#                           no longer on disk or have a new version available.
-#                           Add a --split-args option to group programs based
-#                           on the full command line, which could be used
-#                           to monitor separate "pmon" processes for example:
-#                             ps_mem.py | grep [p]mon
-# V2.2      16 Feb 2010     Support python 3.
-#                           Patch from Brian Harring <ferringb@gmail.com>
-# V2.3      24 Sep 2010     Allow use as python module.
-#                           Patch from Tim Kersten <tim@io41.com>
+# V2.3      24 Sep 2010
+#   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
 #
