@@ -69,7 +69,7 @@
 # by other programs. For e.g. memory used in the X server for
 # a program could be determined, but is not.
 
-import sys, os, string
+import sys, os, errno, string
 try:
     # md5 module is deprecated on python 2.6
     # so try the newer hashlib first
@@ -79,9 +79,22 @@ except ImportError:
     import md5
     md5_new = md5.new
 
+# The following exits cleanly on Ctrl-C or EPIPE
+# while treating other exceptions as before.
+def std_exceptions(etype, value, tb):
+    sys.excepthook=sys.__excepthook__
+    if issubclass(etype, KeyboardInterrupt):
+        pass
+    elif issubclass(etype, IOError) and value.errno == errno.EPIPE:
+        pass
+    else:
+        sys.__excepthook__(etype, value, tb)
+sys.excepthook=std_exceptions
+
 if os.geteuid() != 0:
     sys.stderr.write("Sorry, root permission required.\n");
     if __name__ == '__main__':
+        sys.stderr.close()
         sys.exit(1)
 
 split_args=False
@@ -253,6 +266,10 @@ if __name__ == '__main__':
         sys.stdout.write("%s\n%s%8sB\n%s\n" % ("-" * 33,
             " " * 24, human(total), "=" * 33))
     sys.stdout.write("\n Private  +   Shared  =  RAM used\tProgram \n\n")
+    # We must close explicitly, so that any EPIPE exception
+    # is handled by our excepthook, rather than the default
+    # one which is reenabled after this script finishes.
+    sys.stdout.close()
 
 #Warn of possible inaccuracies
 #2 = accurate & can total
@@ -298,3 +315,4 @@ if __name__ == '__main__':
          "Warning: Shared memory is slightly over-estimated by this system\n"
          "for each program, so totals are not reported.\n"
         )
+    sys.stderr.close()
