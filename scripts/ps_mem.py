@@ -35,7 +35,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V2.5      08 Aug 2011
+# V2.6      13 Aug 2011
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -130,7 +130,8 @@ def kernel_ver():
 
 try:
     kv=kernel_ver()
-except (IOError, OSError), value:
+except (IOError, OSError):
+    value = sys.exc_info()[1]
     if value.errno == errno.ENOENT:
         sys.stderr.write(
           "Couldn't access /proc\n"
