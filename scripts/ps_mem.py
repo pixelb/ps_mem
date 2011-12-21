@@ -72,7 +72,10 @@
 # FreeBSD is supported if linprocfs is mounted at /compat/linux/proc/
 # FreeBSD 8.0 supports up to a level of Linux 2.6.16
 
-import sys, os, errno, string
+import errno
+import os
+import sys
+
 try:
     # md5 module is deprecated on python 2.6
     # so try the newer hashlib first
@@ -82,57 +85,59 @@ except ImportError:
     import md5
     md5_new = md5.new
 
+
 # The following exits cleanly on Ctrl-C or EPIPE
 # while treating other exceptions as before.
 def std_exceptions(etype, value, tb):
-    sys.excepthook=sys.__excepthook__
+    sys.excepthook = sys.__excepthook__
     if issubclass(etype, KeyboardInterrupt):
         pass
     elif issubclass(etype, IOError) and value.errno == errno.EPIPE:
         pass
     else:
         sys.__excepthook__(etype, value, tb)
-sys.excepthook=std_exceptions
+sys.excepthook = std_exceptions
 
 if os.geteuid() != 0:
-    sys.stderr.write("Sorry, root permission required.\n");
+    sys.stderr.write("Sorry, root permission required.\n")
     if __name__ == '__main__':
         sys.stderr.close()
         sys.exit(1)
 
-uname=os.uname()
-if uname[0]=="FreeBSD":
-    proc="/compat/linux/proc/"
+uname = os.uname()
+if uname[0] == "FreeBSD":
+    proc = "/compat/linux/proc/"
 else:
-    proc="/proc/"
+    proc = "/proc/"
 
-split_args=False
-if len(sys.argv)==2 and sys.argv[1] == "--split-args":
+split_args = False
+if len(sys.argv) == 2 and sys.argv[1] == "--split-args":
     split_args = True
 
-PAGESIZE=os.sysconf("SC_PAGE_SIZE")/1024 #KiB
-our_pid=os.getpid()
+PAGESIZE = os.sysconf("SC_PAGE_SIZE") / 1024 #KiB
+our_pid = os.getpid()
+
 
 #(major,minor,release)
 def kernel_ver():
-    kv=open(proc+"sys/kernel/osrelease", "rt").readline().split(".")[:3]
-    last=len(kv)
+    kv = open(proc + "sys/kernel/osrelease", "rt").readline().split(".")[:3]
+    last = len(kv)
     if last == 2:
         kv.append('0')
     last -= 1
     for char in "-_":
-        kv[last]=kv[last].split(char)[0]
+        kv[last] = kv[last].split(char)[0]
     try:
         int(kv[last])
     except:
-        kv[last]=0
+        kv[last] = 0
     return (int(kv[0]), int(kv[1]), int(kv[2]))
 
 try:
-    kv=kernel_ver()
+    kv = kernel_ver()
 except (IOError, OSError):
-    value = sys.exc_info()[1]
-    if value.errno == errno.ENOENT:
+    val = sys.exc_info()[1]
+    if val.errno == errno.ENOENT:
         sys.stderr.write(
           "Couldn't access /proc\n"
           "Only GNU/Linux and FreeBSD (with linprocfs) are supported\n")
@@ -140,20 +145,22 @@ except (IOError, OSError):
     else:
         raise
 
-have_pss=0
+have_pss = 0
+
 
 #return Private,Shared
 #Note shared is always a subset of rss (trs is not always)
 def getMemStats(pid):
     global have_pss
     mem_id = pid #unique
-    Private_lines=[]
-    Shared_lines=[]
-    Pss_lines=[]
-    Rss=int(open(proc+str(pid)+"/statm", "rt").readline().split()[1])*PAGESIZE
-    if os.path.exists(proc+str(pid)+"/smaps"): #stat
+    Private_lines = []
+    Shared_lines = []
+    Pss_lines = []
+    Rss = (int(open(proc + str(pid) + "/statm", "rt").readline().split()[1])
+           * PAGESIZE)
+    if os.path.exists(proc + str(pid) + "/smaps"): #stat
         digester = md5_new()
-        for line in open(proc+str(pid)+"/smaps", "rb").readlines(): #open
+        for line in open(proc + str(pid) + "/smaps", "rb").readlines(): #open
             # Note we checksum smaps as maps is usually but
             # not always different for separate processes.
             digester.update(line)
@@ -163,25 +170,26 @@ def getMemStats(pid):
             elif line.startswith("Private"):
                 Private_lines.append(line)
             elif line.startswith("Pss"):
-                have_pss=1
+                have_pss = 1
                 Pss_lines.append(line)
         mem_id = digester.hexdigest()
-        Shared=sum([int(line.split()[1]) for line in Shared_lines])
-        Private=sum([int(line.split()[1]) for line in Private_lines])
+        Shared = sum([int(line.split()[1]) for line in Shared_lines])
+        Private = sum([int(line.split()[1]) for line in Private_lines])
         #Note Shared + Private = Rss above
         #The Rss in smaps includes video card mem etc.
         if have_pss:
-            pss_adjust=0.5 #add 0.5KiB as this average error due to trunctation
-            Pss=sum([float(line.split()[1])+pss_adjust for line in Pss_lines])
+            pss_adjust = 0.5 # add 0.5KiB as this avg error due to trunctation
+            Pss = sum([float(line.split()[1])+pss_adjust for line in Pss_lines])
             Shared = Pss - Private
     elif (2,6,1) <= kv <= (2,6,9):
-        Shared=0 #lots of overestimation, but what can we do?
+        Shared = 0 #lots of overestimation, but what can we do?
         Private = Rss
     else:
-        Shared=int(open(proc+str(pid)+"/statm", "rt").readline().split()[2])
-        Shared*=PAGESIZE
+        Shared = int(open(proc+str(pid)+"/statm", "rt").readline().split()[2])
+        Shared *= PAGESIZE
         Private = Rss - Shared
     return (Private, Shared, mem_id)
+
 
 def getCmdName(pid):
     cmdline = open(proc+"%d/cmdline" % pid, "rt").read().split("\0")
@@ -205,17 +213,18 @@ def getCmdName(pid):
     exe = os.path.basename(path)
     cmd = open(proc+"%d/status" % pid, "rt").readline()[6:-1]
     if exe.startswith(cmd):
-        cmd=exe #show non truncated version
+        cmd = exe #show non truncated version
         #Note because we show the non truncated name
         #one can have separated programs as follows:
         #584.0 KiB +   1.0 MiB =   1.6 MiB    mozilla-thunder (exe -> bash)
         # 56.0 MiB +  22.2 MiB =  78.2 MiB    mozilla-thunderbird-bin
     return cmd
 
-cmds={}
-shareds={}
-mem_ids={}
-count={}
+
+cmds = {}
+shareds = {}
+mem_ids = {}
+count = {}
 for pid in os.listdir(proc):
     if not pid.isdigit():
         continue
@@ -235,20 +244,20 @@ for pid in os.listdir(proc):
         continue #process gone
     if shareds.get(cmd):
         if have_pss: #add shared portion of PSS together
-            shareds[cmd]+=shared
+            shareds[cmd] += shared
         elif shareds[cmd] < shared: #just take largest shared val
-            shareds[cmd]=shared
+            shareds[cmd] = shared
     else:
-        shareds[cmd]=shared
-    cmds[cmd]=cmds.setdefault(cmd,0)+private
+        shareds[cmd] = shared
+    cmds[cmd] = cmds.setdefault(cmd, 0) + private
     if cmd in count:
-       count[cmd] += 1
+        count[cmd] += 1
     else:
-       count[cmd] = 1
-    mem_ids.setdefault(cmd,{}).update({mem_id:None})
+        count[cmd] = 1
+    mem_ids.setdefault(cmd, {}).update({mem_id:None})
 
 #Add shared mem for each program
-total=0
+total = 0
 for cmd in cmds:
     cmd_count = count[cmd]
     if len(mem_ids[cmd]) == 1 and cmd_count > 1:
@@ -257,31 +266,34 @@ for cmd in cmds:
         cmds[cmd] /= cmd_count
         if have_pss:
             shareds[cmd] /= cmd_count
-    cmds[cmd]=cmds[cmd]+shareds[cmd]
-    total+=cmds[cmd] #valid if PSS available
+    cmds[cmd] = cmds[cmd] + shareds[cmd]
+    total += cmds[cmd] #valid if PSS available
 
 if sys.version_info >= (2, 6):
     sort_list = sorted(cmds.items(), key=lambda x:x[1])
 else:
     sort_list = cmds.items()
-    sort_list.sort(lambda x,y:cmp(x[1],y[1]))
+    sort_list.sort(lambda x, y:cmp(x[1], y[1]))
 # list wrapping is redundant on <py3k, needed for >=pyk3 however
-sort_list=list(filter(lambda x:x[1],sort_list)) #get rid of zero sized processes
+sort_list = list(filter(lambda x:x[1], sort_list)) #get rid of 0 sized processes
+
 
 #The following matches "du -h" output
 #see also human.py
 def human(num, power="Ki"):
-    powers=["Ki","Mi","Gi","Ti"]
+    powers = ["Ki", "Mi", "Gi", "Ti"]
     while num >= 1000: #4 digits
         num /= 1024.0
-        power=powers[powers.index(power)+1]
-    return "%.1f %s" % (num,power)
+        power = powers[powers.index(power)+1]
+    return "%.1f %s" % (num, power)
+
 
 def cmd_with_count(cmd, count):
-    if count>1:
-       return "%s (%u)" % (cmd, count)
+    if count > 1:
+        return "%s (%u)" % (cmd, count)
     else:
-       return cmd
+        return cmd
+
 
 if __name__ == '__main__':
     sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram \n\n")
@@ -298,6 +310,7 @@ if __name__ == '__main__':
     # is handled by our excepthook, rather than the default
     # one which is reenabled after this script finishes.
     sys.stdout.close()
+
 
 #Warn of possible inaccuracies
 #2 = accurate & can total
@@ -324,6 +337,7 @@ def shared_val_accuracy():
         return 2
     else:
         return 1
+
 
 if __name__ == '__main__':
     vm_accuracy = shared_val_accuracy()
