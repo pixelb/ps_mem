@@ -37,6 +37,8 @@
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
 # V2.6      13 Aug 2011
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
+# V3.0      27 Apr 2012     Added -p <pid> and -w (watch) features.
+#                           Complete refactoring so it can be used as a module.
 
 # Notes:
 #
@@ -72,6 +74,8 @@
 # FreeBSD is supported if linprocfs is mounted at /compat/linux/proc/
 # FreeBSD 8.0 supports up to a level of Linux 2.6.16
 
+import getopt
+import time
 import errno
 import os
 import sys
@@ -98,25 +102,66 @@ def std_exceptions(etype, value, tb):
         sys.__excepthook__(etype, value, tb)
 sys.excepthook = std_exceptions
 
-if os.geteuid() != 0:
-    sys.stderr.write("Sorry, root permission required.\n")
-    if __name__ == '__main__':
-        sys.stderr.close()
-        sys.exit(1)
-
+#
+#   Define some global variables
+#
 uname = os.uname()
 if uname[0] == "FreeBSD":
     proc = "/compat/linux/proc/"
 else:
     proc = "/proc/"
 
-split_args = False
-if len(sys.argv) == 2 and sys.argv[1] == "--split-args":
-    split_args = True
-
 PAGESIZE = os.sysconf("SC_PAGE_SIZE") / 1024 #KiB
 our_pid = os.getpid()
 
+have_pss = 0
+
+#
+#   Functions
+#
+
+def parse_options():
+    try:
+        long_options = ['split-args', 'help']
+        opts, args = getopt.getopt(sys.argv[1:], "shp:w:", long_options)
+    except getopt.GetoptError, e:
+        print help()
+        sys.exit(3)
+
+    # ps_mem.py options
+    split_args = False
+    pids_to_show = None
+    watch = None
+
+    for o, a in opts:
+        if o in ('-s', '--split-args'):
+            split_args = True
+        if o in ('-h', '--help'):
+            print help()
+            sys.exit(0)
+        if o in ('-p',):
+            try:
+                pids_to_show = [int(x) for x in a.split(',')]
+            except:
+                print help()
+                sys.exit(3)
+        if o in ('-w',):
+            try:
+                watch = int(a)
+            except:
+                print help()
+                sys.exit(3)
+
+    return (split_args, pids_to_show, watch)
+
+def help():
+    help_msg = 'ps_mem.py - Show process memory usage\n'\
+    '\n'\
+    '-h                                 Show this help\n'\
+    '-w <N>                             Measure and show process memory every N seconds\n'\
+    '-p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list\n'
+
+    return help_msg
 
 #(major,minor,release)
 def kernel_ver():
@@ -132,20 +177,6 @@ def kernel_ver():
     except:
         kv[last] = 0
     return (int(kv[0]), int(kv[1]), int(kv[2]))
-
-try:
-    kv = kernel_ver()
-except (IOError, OSError):
-    val = sys.exc_info()[1]
-    if val.errno == errno.ENOENT:
-        sys.stderr.write(
-          "Couldn't access /proc\n"
-          "Only GNU/Linux and FreeBSD (with linprocfs) are supported\n")
-        sys.exit(2)
-    else:
-        raise
-
-have_pss = 0
 
 
 #return Private,Shared
@@ -181,7 +212,7 @@ def getMemStats(pid):
             pss_adjust = 0.5 # add 0.5KiB as this avg error due to trunctation
             Pss = sum([float(line.split()[1])+pss_adjust for line in Pss_lines])
             Shared = Pss - Private
-    elif (2,6,1) <= kv <= (2,6,9):
+    elif (2,6,1) <= kernel_ver() <= (2,6,9):
         Shared = 0 #lots of overestimation, but what can we do?
         Private = Rss
     else:
@@ -221,63 +252,6 @@ def getCmdName(pid):
     return cmd
 
 
-cmds = {}
-shareds = {}
-mem_ids = {}
-count = {}
-for pid in os.listdir(proc):
-    if not pid.isdigit():
-        continue
-    pid = int(pid)
-    if pid == our_pid:
-        continue
-    try:
-        cmd = getCmdName(pid)
-    except:
-        #permission denied or
-        #kernel threads don't have exe links or
-        #process gone
-        continue
-    try:
-        private, shared, mem_id = getMemStats(pid)
-    except:
-        continue #process gone
-    if shareds.get(cmd):
-        if have_pss: #add shared portion of PSS together
-            shareds[cmd] += shared
-        elif shareds[cmd] < shared: #just take largest shared val
-            shareds[cmd] = shared
-    else:
-        shareds[cmd] = shared
-    cmds[cmd] = cmds.setdefault(cmd, 0) + private
-    if cmd in count:
-        count[cmd] += 1
-    else:
-        count[cmd] = 1
-    mem_ids.setdefault(cmd, {}).update({mem_id:None})
-
-#Add shared mem for each program
-total = 0
-for cmd in cmds:
-    cmd_count = count[cmd]
-    if len(mem_ids[cmd]) == 1 and cmd_count > 1:
-        # Assume this program is using CLONE_VM without CLONE_THREAD
-        # so only account for one of the processes
-        cmds[cmd] /= cmd_count
-        if have_pss:
-            shareds[cmd] /= cmd_count
-    cmds[cmd] = cmds[cmd] + shareds[cmd]
-    total += cmds[cmd] #valid if PSS available
-
-if sys.version_info >= (2, 6):
-    sort_list = sorted(cmds.items(), key=lambda x:x[1])
-else:
-    sort_list = cmds.items()
-    sort_list.sort(lambda x, y:cmp(x[1], y[1]))
-# list wrapping is redundant on <py3k, needed for >=pyk3 however
-sort_list = list(filter(lambda x:x[1], sort_list)) #get rid of 0 sized processes
-
-
 #The following matches "du -h" output
 #see also human.py
 def human(num, power="Ki"):
@@ -294,24 +268,6 @@ def cmd_with_count(cmd, count):
     else:
         return cmd
 
-
-if __name__ == '__main__':
-    sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram \n\n")
-    for cmd in sort_list:
-        sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" %
-                         (human(cmd[1]-shareds[cmd[0]]),
-                          human(shareds[cmd[0]]), human(cmd[1]),
-                          cmd_with_count(cmd[0], count[cmd[0]])))
-    if have_pss:
-        sys.stdout.write("%s\n%s%8sB\n%s\n" %
-                         ("-" * 33, " " * 24, human(total), "=" * 33))
-    sys.stdout.write("\n Private  +   Shared  =  RAM used\tProgram \n\n")
-    # We must close explicitly, so that any EPIPE exception
-    # is handled by our excepthook, rather than the default
-    # one which is reenabled after this script finishes.
-    sys.stdout.close()
-
-
 #Warn of possible inaccuracies
 #2 = accurate & can total
 #1 = accurate only considering each process in isolation
@@ -319,6 +275,7 @@ if __name__ == '__main__':
 #-1= all shared mem not reported
 def shared_val_accuracy():
     """http://wiki.apache.org/spamassassin/TopSharedMemoryBug"""
+    kv = kernel_ver()
     if kv[:2] == (2,4):
         if open(proc+"meminfo", "rt").read().find("Inact_") == -1:
             return 1
@@ -338,9 +295,7 @@ def shared_val_accuracy():
     else:
         return 1
 
-
-if __name__ == '__main__':
-    vm_accuracy = shared_val_accuracy()
+def show_shared_val_accuracy( possible_inacc ):
     if vm_accuracy == -1:
         sys.stderr.write(
          "Warning: Shared memory is not reported by this system.\n"
@@ -361,3 +316,121 @@ if __name__ == '__main__':
          "for each program, so totals are not reported.\n"
         )
     sys.stderr.close()
+
+def get_memory_usage( pids_to_show, split_args, include_self=False ):
+    cmds = {}
+    shareds = {}
+    mem_ids = {}
+    count = {}
+    for pid in os.listdir(proc):
+        if not pid.isdigit():
+            continue
+        pid = int(pid)
+        if pid == our_pid and not include_self:
+            continue
+        if pids_to_show is not None and pid not in pids_to_show:
+            continue
+        try:
+            cmd = getCmdName(pid)
+        except:
+            #permission denied or
+            #kernel threads don't have exe links or
+            #process gone
+            continue
+        try:
+            private, shared, mem_id = getMemStats(pid)
+        except:
+            continue #process gone
+        if shareds.get(cmd):
+            if have_pss: #add shared portion of PSS together
+                shareds[cmd] += shared
+            elif shareds[cmd] < shared: #just take largest shared val
+                shareds[cmd] = shared
+        else:
+            shareds[cmd] = shared
+        cmds[cmd] = cmds.setdefault(cmd, 0) + private
+        if cmd in count:
+            count[cmd] += 1
+        else:
+            count[cmd] = 1
+        mem_ids.setdefault(cmd, {}).update({mem_id:None})
+
+    #Add shared mem for each program
+    total = 0
+    for cmd in cmds:
+        cmd_count = count[cmd]
+        if len(mem_ids[cmd]) == 1 and cmd_count > 1:
+            # Assume this program is using CLONE_VM without CLONE_THREAD
+            # so only account for one of the processes
+            cmds[cmd] /= cmd_count
+            if have_pss:
+                shareds[cmd] /= cmd_count
+        cmds[cmd] = cmds[cmd] + shareds[cmd]
+        total += cmds[cmd] #valid if PSS available
+
+    sorted_cmds = cmds.items()
+    sorted_cmds.sort(lambda x, y:cmp(x[1], y[1]))
+    sorted_cmds = [x for x in sorted_cmds if x[1]]
+
+    return sorted_cmds, shareds, count, total
+
+def print_header():
+    sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram \n\n")
+
+def print_memory_usage(sorted_cmds, shareds, count, total):
+    for cmd in sorted_cmds:
+        sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" %
+                         (human(cmd[1]-shareds[cmd[0]]),
+                          human(shareds[cmd[0]]), human(cmd[1]),
+                          cmd_with_count(cmd[0], count[cmd[0]])))
+    if have_pss:
+        sys.stdout.write("%s\n%s%8sB\n%s\n" %
+                         ("-" * 33, " " * 24, human(total), "=" * 33))
+
+def verify_environment():
+    if os.geteuid() != 0:
+        sys.stderr.write("Sorry, root permission required.\n")
+        if __name__ == '__main__':
+            sys.stderr.close()
+            sys.exit(1)
+
+    try:
+        kv = kernel_ver()
+    except (IOError, OSError):
+        val = sys.exc_info()[1]
+        if val.errno == errno.ENOENT:
+            sys.stderr.write(
+              "Couldn't access /proc\n"
+              "Only GNU/Linux and FreeBSD (with linprocfs) are supported\n")
+            sys.exit(2)
+        else:
+            raise
+
+if __name__ == '__main__':
+    verify_environment()
+    split_args, pids_to_show, watch = parse_options()
+
+    print_header()
+
+    if watch is not None:
+        try:
+            while True:
+                sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+                print_memory_usage(sorted_cmds, shareds, count, total)
+                time.sleep(watch)
+        except KeyboardInterrupt:
+            pass
+    else:
+        # This is the default behavior
+        sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+        print_memory_usage(sorted_cmds, shareds, count, total)
+
+
+    # We must close explicitly, so that any EPIPE exception
+    # is handled by our excepthook, rather than the default
+    # one which is reenabled after this script finishes.
+    sys.stdout.close()
+
+    vm_accuracy = shared_val_accuracy()
+    show_shared_val_accuracy( vm_accuracy )
+
