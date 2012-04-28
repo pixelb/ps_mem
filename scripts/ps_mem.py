@@ -222,7 +222,7 @@ def getMemStats(pid):
     return (Private, Shared, mem_id)
 
 
-def getCmdName(pid):
+def getCmdName(pid, split_args):
     cmdline = open(proc+"%d/cmdline" % pid, "rt").read().split("\0")
     if cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
@@ -317,7 +317,7 @@ def show_shared_val_accuracy( possible_inacc ):
         )
     sys.stderr.close()
 
-def get_memory_usage( pids_to_show, split_args, include_self=False ):
+def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=False ):
     cmds = {}
     shareds = {}
     mem_ids = {}
@@ -326,17 +326,23 @@ def get_memory_usage( pids_to_show, split_args, include_self=False ):
         if not pid.isdigit():
             continue
         pid = int(pid)
+        
+        # Some filters
+        if only_self and pid != our_pid:
+            continue
         if pid == our_pid and not include_self:
             continue
         if pids_to_show is not None and pid not in pids_to_show:
             continue
+        
         try:
-            cmd = getCmdName(pid)
+            cmd = getCmdName(pid, split_args)
         except:
             #permission denied or
             #kernel threads don't have exe links or
             #process gone
             continue
+        
         try:
             private, shared, mem_id = getMemStats(pid)
         except:
