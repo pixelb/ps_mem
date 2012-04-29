@@ -420,10 +420,13 @@ if __name__ == '__main__':
 
     if watch is not None:
         try:
-            while True:
+            sorted_cmds = True
+            while sorted_cmds:
                 sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
                 print_memory_usage(sorted_cmds, shareds, count, total)
                 time.sleep(watch)
+            else:
+                sys.stdout.write('Process does not exist anymore.\n')
         except KeyboardInterrupt:
             pass
     else:
