@@ -35,10 +35,8 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V2.6      13 Aug 2011
+# V2.7      20 May 2011
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
-# V3.0      27 Apr 2012     Added -p <pid> and -w (watch) features.
-#                           Complete refactoring so it can be used as a module.
 
 # Notes:
 #
