@@ -294,21 +294,21 @@ def shared_val_accuracy():
         return 1
 
 def show_shared_val_accuracy( possible_inacc ):
-    if vm_accuracy == -1:
+    if possible_inacc == -1:
         sys.stderr.write(
          "Warning: Shared memory is not reported by this system.\n"
         )
         sys.stderr.write(
          "Values reported will be too large, and totals are not reported\n"
         )
-    elif vm_accuracy == 0:
+    elif possible_inacc == 0:
         sys.stderr.write(
          "Warning: Shared memory is not reported accurately by this system.\n"
         )
         sys.stderr.write(
          "Values reported could be too large, and totals are not reported\n"
         )
-    elif vm_accuracy == 1:
+    elif possible_inacc == 1:
         sys.stderr.write(
          "Warning: Shared memory is slightly over-estimated by this system\n"
          "for each program, so totals are not reported.\n"
