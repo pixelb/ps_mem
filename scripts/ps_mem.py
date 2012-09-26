@@ -7,8 +7,9 @@
 # The shared RAM is problematic to calculate, and this script automatically
 # selects the most accurate method available for your kernel.
 
-# Author: P@draigBrady.com
-# Source: http://www.pixelbeat.org/scripts/ps_mem.py
+# Licence: LGPLv2
+# Author:  P@draigBrady.com
+# Source:  http://www.pixelbeat.org/scripts/ps_mem.py
 
 # V1.0      06 Jul 2005     Initial release
 # V1.1      11 Aug 2006     root permission required for accuracy
