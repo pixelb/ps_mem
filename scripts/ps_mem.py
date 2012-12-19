@@ -104,16 +104,28 @@ sys.excepthook = std_exceptions
 #
 #   Define some global variables
 #
-uname = os.uname()
-if uname[0] == "FreeBSD":
-    proc = "/compat/linux/proc/"
-else:
-    proc = "/proc/"
 
 PAGESIZE = os.sysconf("SC_PAGE_SIZE") / 1024 #KiB
 our_pid = os.getpid()
 
 have_pss = 0
+
+class Proc:
+    def __init__(self):
+        uname = os.uname()
+        if uname[0] == "FreeBSD":
+            self.proc = '/compat/linux/proc'
+        else:
+            self.proc = '/proc'
+
+    def path(self, *args):
+        return os.path.join(self.proc, *(str(a) for a in args))
+
+    def open(self, *args):
+        return open(self.path(*args))
+
+proc = Proc()
+
 
 #
 #   Functions
@@ -164,7 +176,7 @@ def help():
 
 #(major,minor,release)
 def kernel_ver():
-    kv = open(proc + "sys/kernel/osrelease", "rt").readline().split(".")[:3]
+    kv = proc.open('sys/kernel/osrelease').readline().split(".")[:3]
     last = len(kv)
     if last == 2:
         kv.append('0')
@@ -186,11 +198,11 @@ def getMemStats(pid):
     Private_lines = []
     Shared_lines = []
     Pss_lines = []
-    Rss = (int(open(proc + str(pid) + "/statm", "rt").readline().split()[1])
+    Rss = (int(proc.open(pid, 'statm').readline().split()[1])
            * PAGESIZE)
-    if os.path.exists(proc + str(pid) + "/smaps"): #stat
+    if os.path.exists(proc.path(pid, 'smaps')): #stat
         digester = md5_new()
-        for line in open(proc + str(pid) + "/smaps", "rb").readlines(): #open
+        for line in proc.open(pid, 'smaps').readlines(): #open
             # Note we checksum smaps as maps is usually but
             # not always different for separate processes.
             digester.update(line)
@@ -215,17 +227,18 @@ def getMemStats(pid):
         Shared = 0 #lots of overestimation, but what can we do?
         Private = Rss
     else:
-        Shared = int(open(proc+str(pid)+"/statm", "rt").readline().split()[2])
+        Shared = int(proc.open(pid, 'statm').readline().split()[2])
         Shared *= PAGESIZE
         Private = Rss - Shared
     return (Private, Shared, mem_id)
 
 
 def getCmdName(pid, split_args):
-    cmdline = open(proc+"%d/cmdline" % pid, "rt").read().split("\0")
+    cmdline = proc.open(pid, 'cmdline').read().split("\0")
     if cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
-    path = os.path.realpath(proc+"%d/exe" % pid) #exception for kernel threads
+    path = proc.path(pid, 'exe')
+    path = os.path.realpath(path) #exception for kernel threads
     if split_args:
         return " ".join(cmdline)
     if path.endswith(" (deleted)"):
@@ -241,7 +254,7 @@ def getCmdName(pid, split_args):
             else:
                 path += " [deleted]"
     exe = os.path.basename(path)
-    cmd = open(proc+"%d/status" % pid, "rt").readline()[6:-1]
+    cmd = proc.open(pid, 'status').readline()[6:-1]
     if exe.startswith(cmd):
         cmd = exe #show non truncated version
         #Note because we show the non truncated name
@@ -276,13 +289,13 @@ def shared_val_accuracy():
     """http://wiki.apache.org/spamassassin/TopSharedMemoryBug"""
     kv = kernel_ver()
     if kv[:2] == (2,4):
-        if open(proc+"meminfo", "rt").read().find("Inact_") == -1:
+        if proc.open('meminfo').read().find("Inact_") == -1:
             return 1
         return 0
     elif kv[:2] == (2,6):
-        pid = str(os.getpid())
-        if os.path.exists(proc+pid+"/smaps"):
-            if open(proc+pid+"/smaps", "rt").read().find("Pss:")!=-1:
+        pid = os.getpid()
+        if os.path.exists(proc.path(pid, 'smaps')):
+            if proc.open(pid, 'smaps').read().find("Pss:")!=-1:
                 return 2
             else:
                 return 1
@@ -321,11 +334,11 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
     shareds = {}
     mem_ids = {}
     count = {}
-    for pid in os.listdir(proc):
+    for pid in os.listdir(proc.path('')):
         if not pid.isdigit():
             continue
         pid = int(pid)
-        
+
         # Some filters
         if only_self and pid != our_pid:
             continue
@@ -333,7 +346,7 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
             continue
         if pids_to_show is not None and pid not in pids_to_show:
             continue
-        
+
         try:
             cmd = getCmdName(pid, split_args)
         except:
@@ -341,7 +354,7 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
             #kernel threads don't have exe links or
             #process gone
             continue
-        
+
         try:
             private, shared, mem_id = getMemStats(pid)
         except:
@@ -405,7 +418,7 @@ def verify_environment():
         val = sys.exc_info()[1]
         if val.errno == errno.ENOENT:
             sys.stderr.write(
-              "Couldn't access /proc\n"
+              "Couldn't access " + proc.path('') + "\n"
               "Only GNU/Linux and FreeBSD (with linprocfs) are supported\n")
             sys.exit(2)
         else:
