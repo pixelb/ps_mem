@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V2.7      20 May 2011
+# V3.0      01 Feb 2013
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -135,8 +135,8 @@ def parse_options():
     try:
         long_options = ['split-args', 'help']
         opts, args = getopt.getopt(sys.argv[1:], "shp:w:", long_options)
-    except getopt.GetoptError, e:
-        print help()
+    except getopt.GetoptError:
+        sys.stderr.write(help())
         sys.exit(3)
 
     # ps_mem.py options
@@ -148,19 +148,19 @@ def parse_options():
         if o in ('-s', '--split-args'):
             split_args = True
         if o in ('-h', '--help'):
-            print help()
+            sys.stdout.write(help())
             sys.exit(0)
         if o in ('-p',):
             try:
                 pids_to_show = [int(x) for x in a.split(',')]
             except:
-                print help()
+                sys.stderr.write(help())
                 sys.exit(3)
         if o in ('-w',):
             try:
                 watch = int(a)
             except:
-                print help()
+                sys.stderr.write(help())
                 sys.exit(3)
 
     return (split_args, pids_to_show, watch)
@@ -205,8 +205,7 @@ def getMemStats(pid):
         for line in proc.open(pid, 'smaps').readlines(): #open
             # Note we checksum smaps as maps is usually but
             # not always different for separate processes.
-            digester.update(line)
-            line = line.decode("ascii")
+            digester.update(line.encode('latin1'))
             if line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
@@ -357,7 +356,7 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
 
         try:
             private, shared, mem_id = getMemStats(pid)
-        except:
+        except RuntimeError:
             continue #process gone
         if shareds.get(cmd):
             if have_pss: #add shared portion of PSS together
@@ -386,8 +385,7 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
         cmds[cmd] = cmds[cmd] + shareds[cmd]
         total += cmds[cmd] #valid if PSS available
 
-    sorted_cmds = cmds.items()
-    sorted_cmds.sort(lambda x, y:cmp(x[1], y[1]))
+    sorted_cmds = sorted(cmds.items(), key=lambda x:x[1])
     sorted_cmds = [x for x in sorted_cmds if x[1]]
 
     return sorted_cmds, shareds, count, total
