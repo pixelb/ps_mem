@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.0      01 Feb 2013
+# V3.1      10 May 2013
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -122,7 +122,13 @@ class Proc:
         return os.path.join(self.proc, *(str(a) for a in args))
 
     def open(self, *args):
-        return open(self.path(*args))
+        try:
+            return open(self.path(*args))
+        except (IOError, OSError):
+            val = sys.exc_info()[1]
+            if (val.errno == errno.ENOENT or # kernel thread or process gone
+                val.errno == errno.EPERM):
+                raise LookupError
 
 proc = Proc()
 
@@ -236,8 +242,19 @@ def getCmdName(pid, split_args):
     cmdline = proc.open(pid, 'cmdline').read().split("\0")
     if cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
+
     path = proc.path(pid, 'exe')
-    path = os.path.realpath(path) #exception for kernel threads
+    try:
+        path = os.readlink(path)
+        # Some symlink targets were seen to contain NULs on RHEL 5 at least
+        # https://github.com/pixelb/scripts/pull/10, so take string up to NUL
+        path = path.split('\0')[0]
+    except OSError:
+        val = sys.exc_info()[1]
+        if (val.errno == errno.ENOENT or # either kernel thread or process gone
+            val.errno == errno.EPERM):
+            raise LookupError
+
     if split_args:
         return " ".join(cmdline)
     if path.endswith(" (deleted)"):
@@ -348,7 +365,7 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
 
         try:
             cmd = getCmdName(pid, split_args)
-        except:
+        except LookupError:
             #permission denied or
             #kernel threads don't have exe links or
             #process gone
