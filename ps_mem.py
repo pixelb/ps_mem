@@ -176,7 +176,8 @@ def help():
     '\n'\
     '-h                                 Show this help\n'\
     '-w <N>                             Measure and show process memory every N seconds\n'\
-    '-p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list\n'
+    '-p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list\n' \
+    '-s, --split-args                   Show and separate by, all command line arguments\n'
 
     return help_msg
 
