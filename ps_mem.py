@@ -409,7 +409,7 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
     return sorted_cmds, shareds, count, total
 
 def print_header():
-    sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram \n\n")
+    sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram\n\n")
 
 def print_memory_usage(sorted_cmds, shareds, count, total):
     for cmd in sorted_cmds:
@@ -470,4 +470,3 @@ if __name__ == '__main__':
 
     vm_accuracy = shared_val_accuracy()
     show_shared_val_accuracy( vm_accuracy )
-
