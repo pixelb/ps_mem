@@ -27,3 +27,9 @@ Example output:
 =================================
 ```
 
+The [-p PID] option allows filtering the results.
+For example to restrict output to the current $USER you could:
+
+```
+sudo ps_mem -p $(pgrep -u $USER | paste -d, -s)
+```
