@@ -129,6 +129,7 @@ class Proc:
             if (val.errno == errno.ENOENT or # kernel thread or process gone
                 val.errno == errno.EPERM):
                 raise LookupError
+            raise
 
 proc = Proc()
 
@@ -255,6 +256,7 @@ def getCmdName(pid, split_args):
         if (val.errno == errno.ENOENT or # either kernel thread or process gone
             val.errno == errno.EPERM):
             raise LookupError
+        raise
 
     if split_args:
         return " ".join(cmdline)
