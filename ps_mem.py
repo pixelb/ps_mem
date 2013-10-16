@@ -369,7 +369,7 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
         try:
             cmd = getCmdName(pid, split_args)
         except LookupError:
-            #permission denied or
+            #operation not permitted
             #kernel threads don't have exe links or
             #process gone
             continue
