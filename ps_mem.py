@@ -140,8 +140,8 @@ proc = Proc()
 
 def parse_options():
     try:
-        long_options = ['split-args', 'help']
-        opts, args = getopt.getopt(sys.argv[1:], "shp:w:", long_options)
+        long_options = ['split-args', 'help', 'processes']
+        opts, args = getopt.getopt(sys.argv[1:], "shp:w:P:", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
@@ -149,6 +149,7 @@ def parse_options():
     # ps_mem.py options
     split_args = False
     pids_to_show = None
+    processes_to_show = None
     watch = None
 
     for o, a in opts:
@@ -163,6 +164,12 @@ def parse_options():
             except:
                 sys.stderr.write(help())
                 sys.exit(3)
+        if o in ('-P', '--processes'):
+            try:
+                processes_to_show = [str(x) for x in a.split(',')]
+            except:
+                sys.stderr.write(help())
+                sys.exit(3)
         if o in ('-w',):
             try:
                 watch = int(a)
@@ -170,7 +177,7 @@ def parse_options():
                 sys.stderr.write(help())
                 sys.exit(3)
 
-    return (split_args, pids_to_show, watch)
+    return (split_args, pids_to_show, processes_to_show, watch)
 
 def help():
     help_msg = 'ps_mem.py - Show process memory usage\n'\
@@ -178,6 +185,7 @@ def help():
     '-h                                 Show this help\n'\
     '-w <N>                             Measure and show process memory every N seconds\n'\
     '-p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list\n' \
+    '-P <procname>[,otherprocname,...]  Only show memory usage for processes in the specified list\n' \
     '-s, --split-args                   Show and separate by, all command line arguments\n'
 
     return help_msg
@@ -241,6 +249,7 @@ def getMemStats(pid):
 
 
 def getCmdName(pid, split_args):
+    #Return the cmd name (or all exe line) and the filter based on the cmd name
     cmdline = proc.open(pid, 'cmdline').read().split("\0")
     if cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
@@ -258,8 +267,6 @@ def getCmdName(pid, split_args):
             raise LookupError
         raise
 
-    if split_args:
-        return " ".join(cmdline)
     if path.endswith(" (deleted)"):
         path = path[:-10]
         if os.path.exists(path):
@@ -280,7 +287,9 @@ def getCmdName(pid, split_args):
         #one can have separated programs as follows:
         #584.0 KiB +   1.0 MiB =   1.6 MiB    mozilla-thunder (exe -> bash)
         # 56.0 MiB +  22.2 MiB =  78.2 MiB    mozilla-thunderbird-bin
-    return cmd
+    if split_args:
+        return (" ".join(cmdline),cmd)
+    return (cmd,cmd)
 
 
 #The following matches "du -h" output
@@ -348,7 +357,7 @@ def show_shared_val_accuracy( possible_inacc ):
         )
     sys.stderr.close()
 
-def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=False ):
+def get_memory_usage( pids_to_show, processes_to_show, split_args, include_self=False, only_self=False ):
     cmds = {}
     shareds = {}
     mem_ids = {}
@@ -367,11 +376,14 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
             continue
 
         try:
-            cmd = getCmdName(pid, split_args)
+            cmd,filter_cmd = getCmdName(pid, split_args)
         except LookupError:
             #operation not permitted
             #kernel threads don't have exe links or
             #process gone
+            continue
+
+        if processes_to_show is not None and filter_cmd not in processes_to_show:
             continue
 
         try:
@@ -444,7 +456,7 @@ def verify_environment():
 
 if __name__ == '__main__':
     verify_environment()
-    split_args, pids_to_show, watch = parse_options()
+    split_args, pids_to_show, processes_to_show, watch = parse_options()
 
     print_header()
 
@@ -452,7 +464,7 @@ if __name__ == '__main__':
         try:
             sorted_cmds = True
             while sorted_cmds:
-                sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+                sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, processes_to_show, split_args )
                 print_memory_usage(sorted_cmds, shareds, count, total)
                 time.sleep(watch)
             else:
@@ -461,7 +473,7 @@ if __name__ == '__main__':
             pass
     else:
         # This is the default behavior
-        sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+        sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, processes_to_show, split_args )
         print_memory_usage(sorted_cmds, shareds, count, total)
 
 
