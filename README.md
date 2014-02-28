@@ -9,7 +9,7 @@ but for backwards compatible reasons the ps_mem name remains.
 Usage:
 
 ```
-ps_mem [-h|--help] [-s|--split-args] [-p PID] [-w N]
+ps_mem [-h|--help] [-s|--split-args] [-p PID] [-P|--processes PROCNAME] [-w N]
 ```
 
 Example output:
@@ -32,4 +32,18 @@ For example to restrict output to the current $USER you could:
 
 ```
 sudo ps_mem -p $(pgrep -u $USER | paste -d, -s)
+```
+
+The [-P|--processes PROCNAME] option allows filtering the results.
+For example to restrict output the process chrome you could:
+
+```
+sudo ps_mem -P chrome
+ Private  +   Shared  =  RAM used	Program
+
+272.2 MiB +  43.9 MiB = 316.1 MiB       chrome (12)
+---------------------------------
+                        316.1 MiB
+=================================
+
 ```
