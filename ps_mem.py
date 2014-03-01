@@ -427,7 +427,7 @@ def print_memory_usage(sorted_cmds, shareds, count, total):
                           human(shareds[cmd[0]]), human(cmd[1]),
                           cmd_with_count(cmd[0], count[cmd[0]])))
     if have_pss:
-        sys.stdout.write("%s\n%s%8sB\n%s\n" %
+        sys.stdout.write("%s\n%s%8sB\tTotal\n%s\n" %
                          ("-" * 33, " " * 24, human(total), "=" * 33))
 
 def verify_environment():
