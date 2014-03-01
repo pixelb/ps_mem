@@ -31,5 +31,13 @@ The [-p PID] option allows filtering the results.
 For example to restrict output to the current $USER you could:
 
 ```
-sudo ps_mem -p $(pgrep -u $USER | paste -d, -s)
+sudo ps_mem -p $(pgrep -d, -u $USER)
+```
+
+or to summarize the total RAM usage per user you could:
+
+```
+for i in $(ps -e -o user= | sort | uniq); do
+  printf '%-20s%10s\n' $i $(sudo ps_mem --total -p $(pgrep -d, -u $i))
+done
 ```
