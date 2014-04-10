@@ -140,14 +140,15 @@ proc = Proc()
 
 def parse_options():
     try:
-        long_options = ['split-args', 'help', 'total']
-        opts, args = getopt.getopt(sys.argv[1:], "shtp:w:", long_options)
+        long_options = ['split-args', 'help', 'total', 'descending']
+        opts, args = getopt.getopt(sys.argv[1:], "shtdp:w:", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
 
     # ps_mem.py options
     split_args = False
+    descending = False
     pids_to_show = None
     watch = None
     only_total = False
@@ -157,6 +158,8 @@ def parse_options():
             split_args = True
         if o in ('-t', '--total'):
             only_total = True
+        if o in ('-d', 'descending'):
+            descending = True
         if o in ('-h', '--help'):
             sys.stdout.write(help())
             sys.exit(0)
@@ -173,7 +176,7 @@ def parse_options():
                 sys.stderr.write(help())
                 sys.exit(3)
 
-    return (split_args, pids_to_show, watch, only_total)
+    return (split_args, descending, pids_to_show, watch, only_total)
 
 def help():
     help_msg = 'ps_mem.py - Show process memory usage\n'\
@@ -182,6 +185,7 @@ def help():
     '-w <N>                             Measure and show process memory every N seconds\n'\
     '-p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list\n' \
     '-s, --split-args                   Show and separate by, all command line arguments\n' \
+    '-d, --descending                   Show usage in desending order\n' \
     '-t, --total                        Show only the total value\n'
 
     return help_msg
@@ -355,7 +359,7 @@ def show_shared_val_accuracy( possible_inacc, only_total=False ):
     if only_total and possible_inacc != 2:
         sys.exit(1)
 
-def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=False ):
+def get_memory_usage( pids_to_show, split_args, descending, include_self=False, only_self=False ):
     cmds = {}
     shareds = {}
     mem_ids = {}
@@ -414,21 +418,34 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
 
     sorted_cmds = sorted(cmds.items(), key=lambda x:x[1])
     sorted_cmds = [x for x in sorted_cmds if x[1]]
-
-    return sorted_cmds, shareds, count, total
+  
+    if descending is True:
+        descending_cmds = []
+        total_len = len(sorted_cmds)
+        for i in sorted_cmds:
+            total_len -= 1
+            descending_cmds.append(sorted_cmds[total_len])
+        return descending_cmds, shareds, count, total
+    else:
+        return sorted_cmds, shareds, count, total
 
 def print_header():
     sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram\n\n")
 
-def print_memory_usage(sorted_cmds, shareds, count, total):
+def print_memory_usage(sorted_cmds, shareds, count, total, descending):
+    proc_sum = sum([proc_count for proc,proc_count in count.iteritems()]) 
+    if have_pss and descending is True:
+        sys.stdout.write("%s\n%s%8sB\tTotal (%d)\n%s\n" %
+                        ("-" * 33, " " * 24, human(total), proc_sum, "=" * 33))
     for cmd in sorted_cmds:
         sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" %
                          (human(cmd[1]-shareds[cmd[0]]),
                           human(shareds[cmd[0]]), human(cmd[1]),
                           cmd_with_count(cmd[0], count[cmd[0]])))
-    if have_pss:
-        sys.stdout.write("%s\n%s%8sB\n%s\n" %
-                         ("-" * 33, " " * 24, human(total), "=" * 33))
+    else:
+        if have_pss and descending is False:
+            sys.stdout.write("%s\n%s%8sB\tTotal (%d)\n%s\n" %
+                            ("-" * 33, " " * 24, human(total), proc_sum, "=" * 33))
 
 def verify_environment():
     if os.geteuid() != 0:
@@ -451,7 +468,7 @@ def verify_environment():
 
 if __name__ == '__main__':
     verify_environment()
-    split_args, pids_to_show, watch, only_total = parse_options()
+    split_args, descending, pids_to_show, watch, only_total = parse_options()
 
     if not only_total:
         print_header()
@@ -460,9 +477,10 @@ if __name__ == '__main__':
         try:
             sorted_cmds = True
             while sorted_cmds:
-                sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+                sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args, descending)
                 if only_total and have_pss:
                     sys.stdout.write(human(total).replace(' ','')+'B')
+                    sys.stdout.write('\n')
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total)
                 time.sleep(watch)
@@ -472,11 +490,12 @@ if __name__ == '__main__':
             pass
     else:
         # This is the default behavior
-        sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+        sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args, descending )
         if only_total and have_pss:
             sys.stdout.write(human(total).replace(' ','')+'B')
+            sys.stdout.write('\n')
         elif not only_total:
-            print_memory_usage(sorted_cmds, shareds, count, total)
+            print_memory_usage(sorted_cmds, shareds, count, total, descending)
 
     # We must close explicitly, so that any EPIPE exception
     # is handled by our excepthook, rather than the default
