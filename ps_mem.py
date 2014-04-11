@@ -462,7 +462,7 @@ if __name__ == '__main__':
             while sorted_cmds:
                 sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
                 if only_total and have_pss:
-                    sys.stdout.write(human(total).replace(' ','')+'B')
+                    sys.stdout.write(human(total).replace(' ','')+'B\n')
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total)
                 time.sleep(watch)
@@ -474,7 +474,7 @@ if __name__ == '__main__':
         # This is the default behavior
         sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
         if only_total and have_pss:
-            sys.stdout.write(human(total).replace(' ','')+'B')
+            sys.stdout.write(human(total).replace(' ','')+'B\n')
         elif not only_total:
             print_memory_usage(sorted_cmds, shareds, count, total)
 
