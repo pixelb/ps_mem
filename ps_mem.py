@@ -193,12 +193,14 @@ def kernel_ver():
     if last == 2:
         kv.append('0')
     last -= 1
-    for char in "-_":
-        kv[last] = kv[last].split(char)[0]
-    try:
-        int(kv[last])
-    except:
-        kv[last] = 0
+    while last > 0:
+        for char in "-_":
+            kv[last] = kv[last].split(char)[0]
+        try:
+            int(kv[last])
+        except:
+            kv[last] = 0
+        last -= 1
     return (int(kv[0]), int(kv[1]), int(kv[2]))
 
 
