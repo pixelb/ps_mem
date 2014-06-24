@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.2      01 Mar 2014
+# V3.3      24 Jun 2014
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -193,12 +193,14 @@ def kernel_ver():
     if last == 2:
         kv.append('0')
     last -= 1
-    for char in "-_":
-        kv[last] = kv[last].split(char)[0]
-    try:
-        int(kv[last])
-    except:
-        kv[last] = 0
+    while last > 0:
+        for char in "-_":
+            kv[last] = kv[last].split(char)[0]
+        try:
+            int(kv[last])
+        except:
+            kv[last] = 0
+        last -= 1
     return (int(kv[0]), int(kv[1]), int(kv[2]))
 
 
