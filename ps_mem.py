@@ -140,8 +140,8 @@ proc = Proc()
 
 def parse_options():
     try:
-        long_options = ['split-args', 'help', 'total', 'kb']
-        opts, args = getopt.getopt(sys.argv[1:], "shtp:w:k", long_options)
+        long_options = ['split-args', 'help', 'total', 'kb', 'group-args']
+        opts, args = getopt.getopt(sys.argv[1:], "shtp:w:kg", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
@@ -152,6 +152,7 @@ def parse_options():
     watch = None
     only_total = False
     show_kbytes = False
+    group_args = False
 
     for o, a in opts:
         if o in ('-s', '--split-args'):
@@ -160,6 +161,9 @@ def parse_options():
             only_total = True
         if o in ('-k', '--kb'):
             show_kbytes = True
+        if o in ('-g', '--group-args'):
+            group_args = True 
+            show_kbytes = True           
         if o in ('-h', '--help'):
             sys.stdout.write(help())
             sys.exit(0)
@@ -176,17 +180,19 @@ def parse_options():
                 sys.stderr.write(help())
                 sys.exit(3)
 
-    return (split_args, pids_to_show, watch, only_total, show_kbytes)
+    return (split_args, pids_to_show, watch, only_total, show_kbytes, group_args)
 
 def help():
-    help_msg = 'ps_mem.py - Show process memory usage\n'\
-    '\n'\
-    '-h                                 Show this help\n'\
-    '-w <N>                             Measure and show process memory every N seconds\n'\
-    '-p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list\n' \
-    '-s, --split-args                   Show and separate by, all command line arguments\n' \
-    '-k, --kb                           Show name and kilobytes only\n' \
-    '-t, --total                        Show only the total value\n'
+    help_msg = """ps_mem.py - Show process memory usage
+
+    -h                                 Show this help
+    -w <N>                             Measure and show process memory every N seconds
+    -p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list
+    -s, --split-args                   Show and separate by, all command line arguments
+    -k, --kb                           Show name and kilobytes only
+    -g, --group-args                   Group by name and arguments, show kilobytes
+    -t, --total                        Show only the total value
+"""
 
     return help_msg
 
@@ -290,7 +296,7 @@ def getCmdName(pid, split_args):
         #one can have separated programs as follows:
         #584.0 KiB +   1.0 MiB =   1.6 MiB    mozilla-thunder (exe -> bash)
         # 56.0 MiB +  22.2 MiB =  78.2 MiB    mozilla-thunderbird-bin
-    return cmd
+    return cmd, ' '.join(cmdline[1:])
 
 
 #The following matches "du -h" output
@@ -361,7 +367,7 @@ def show_shared_val_accuracy( possible_inacc, only_total=False ):
     if only_total and possible_inacc != 2:
         sys.exit(1)
 
-def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=False ):
+def get_memory_usage( pids_to_show, split_args, group_args, include_self=False, only_self=False ):
     cmds = {}
     shareds = {}
     mem_ids = {}
@@ -380,7 +386,9 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
             continue
 
         try:
-            cmd = getCmdName(pid, split_args)
+            cmd, cmd_args = getCmdName(pid, split_args)
+            if group_args:
+                cmd = ' '.join([cmd, cmd_args])
         except LookupError:
             #operation not permitted
             #kernel threads don't have exe links or
@@ -426,10 +434,10 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
 def print_header():
     sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram\n\n")
 
-def print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes):
+def print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes, group_args):
     for cmd in sorted_cmds:
         if show_kbytes:
-            sys.stdout.write("%s\t%s\n" % (cmd[0], int(cmd[1])))
+            sys.stdout.write("%s\t%s\n" % (int(cmd[1]), cmd[0]))
         else:
             sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" %
                          (human(cmd[1]-shareds[cmd[0]]),
@@ -460,7 +468,7 @@ def verify_environment():
 
 if __name__ == '__main__':
     verify_environment()
-    split_args, pids_to_show, watch, only_total, show_kbytes = parse_options()
+    split_args, pids_to_show, watch, only_total, show_kbytes, group_args = parse_options()
 
     if not only_total and not show_kbytes:
         print_header()
@@ -469,11 +477,11 @@ if __name__ == '__main__':
         try:
             sorted_cmds = True
             while sorted_cmds:
-                sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+                sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args, group_args)
                 if only_total and have_pss:
                     sys.stdout.write(human(total).replace(' ','')+'B\n')
                 elif not only_total:
-                    print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes)
+                    print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes, group_args)
                 time.sleep(watch)
             else:
                 sys.stdout.write('Process does not exist anymore.\n')
@@ -481,11 +489,11 @@ if __name__ == '__main__':
             pass
     else:
         # This is the default behavior
-        sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
+        sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args, group_args)
         if only_total and have_pss:
             sys.stdout.write(human(total).replace(' ','')+'B\n')
         elif not only_total:
-            print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes)
+            print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes, group_args)
 
     # We must close explicitly, so that any EPIPE exception
     # is handled by our excepthook, rather than the default
