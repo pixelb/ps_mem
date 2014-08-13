@@ -140,8 +140,8 @@ proc = Proc()
 
 def parse_options():
     try:
-        long_options = ['split-args', 'help', 'total']
-        opts, args = getopt.getopt(sys.argv[1:], "shtp:w:", long_options)
+        long_options = ['split-args', 'help', 'total', 'kb']
+        opts, args = getopt.getopt(sys.argv[1:], "shtp:w:k", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
@@ -151,12 +151,15 @@ def parse_options():
     pids_to_show = None
     watch = None
     only_total = False
+    show_kbytes = False
 
     for o, a in opts:
         if o in ('-s', '--split-args'):
             split_args = True
         if o in ('-t', '--total'):
             only_total = True
+        if o in ('-k', '--kb'):
+            show_kbytes = True
         if o in ('-h', '--help'):
             sys.stdout.write(help())
             sys.exit(0)
@@ -173,7 +176,7 @@ def parse_options():
                 sys.stderr.write(help())
                 sys.exit(3)
 
-    return (split_args, pids_to_show, watch, only_total)
+    return (split_args, pids_to_show, watch, only_total, show_kbytes)
 
 def help():
     help_msg = 'ps_mem.py - Show process memory usage\n'\
@@ -182,6 +185,7 @@ def help():
     '-w <N>                             Measure and show process memory every N seconds\n'\
     '-p <pid>[,pid2,...pidN]            Only show memory usage PIDs in the specified list\n' \
     '-s, --split-args                   Show and separate by, all command line arguments\n' \
+    '-k, --kb                           Show name and kilobytes only\n' \
     '-t, --total                        Show only the total value\n'
 
     return help_msg
@@ -422,13 +426,16 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
 def print_header():
     sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram\n\n")
 
-def print_memory_usage(sorted_cmds, shareds, count, total):
+def print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes):
     for cmd in sorted_cmds:
-        sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" %
+        if show_kbytes:
+            sys.stdout.write("%s\t%s\n" % (cmd[0], int(cmd[1])))
+        else:
+            sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" %
                          (human(cmd[1]-shareds[cmd[0]]),
                           human(shareds[cmd[0]]), human(cmd[1]),
                           cmd_with_count(cmd[0], count[cmd[0]])))
-    if have_pss:
+    if have_pss and not show_kbytes:
         sys.stdout.write("%s\n%s%8sB\n%s\n" %
                          ("-" * 33, " " * 24, human(total), "=" * 33))
 
@@ -453,9 +460,9 @@ def verify_environment():
 
 if __name__ == '__main__':
     verify_environment()
-    split_args, pids_to_show, watch, only_total = parse_options()
+    split_args, pids_to_show, watch, only_total, show_kbytes = parse_options()
 
-    if not only_total:
+    if not only_total and not show_kbytes:
         print_header()
 
     if watch is not None:
@@ -466,7 +473,7 @@ if __name__ == '__main__':
                 if only_total and have_pss:
                     sys.stdout.write(human(total).replace(' ','')+'B\n')
                 elif not only_total:
-                    print_memory_usage(sorted_cmds, shareds, count, total)
+                    print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes)
                 time.sleep(watch)
             else:
                 sys.stdout.write('Process does not exist anymore.\n')
@@ -478,7 +485,7 @@ if __name__ == '__main__':
         if only_total and have_pss:
             sys.stdout.write(human(total).replace(' ','')+'B\n')
         elif not only_total:
-            print_memory_usage(sorted_cmds, shareds, count, total)
+            print_memory_usage(sorted_cmds, shareds, count, total, show_kbytes)
 
     # We must close explicitly, so that any EPIPE exception
     # is handled by our excepthook, rather than the default
