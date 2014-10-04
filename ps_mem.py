@@ -146,6 +146,10 @@ def parse_options():
         sys.stderr.write(help())
         sys.exit(3)
 
+    if len(args):
+        sys.stderr.write("Extraneous arguments: %s\n" % args)
+        sys.exit(3)
+
     # ps_mem.py options
     split_args = False
     pids_to_show = None
