@@ -455,8 +455,8 @@ def verify_environment():
             raise
 
 if __name__ == '__main__':
-    verify_environment()
     split_args, pids_to_show, watch, only_total = parse_options()
+    verify_environment()
 
     if not only_total:
         print_header()
