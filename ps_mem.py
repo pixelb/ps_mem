@@ -176,7 +176,7 @@ def parse_options():
     return (split_args, pids_to_show, watch, only_total)
 
 def help():
-    help_msg = 'ps_mem.py - Show process memory usage\n'\
+    help_msg = 'ps_mem - Show process memory usage\n'\
     '\n'\
     '-h                            Show this help\n'\
     '-w <N>                        Measure and show process memory every N seconds\n'\

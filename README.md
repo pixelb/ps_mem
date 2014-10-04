@@ -9,7 +9,7 @@ but for backwards compatible reasons the ps_mem name remains.
 Usage:
 
 ```
-ps_mem [-h|--help] [-s|--split-args] [-p PID] [-w N]
+ps_mem [-h|--help] [-p PID,...] [-s|--split-args] [-t|--total] [-w N]
 ```
 
 Example output:
@@ -27,7 +27,7 @@ Example output:
 =================================
 ```
 
-The [-p PID] option allows filtering the results.
+The [-p PID,...] option allows filtering the results.
 For example to restrict output to the current $USER you could:
 
 ```

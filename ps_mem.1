@@ -1,11 +1,10 @@
-.\" Simple man page to ps_mem.py script
+.\" Simple man page to ps_mem script
 .\" Contact fholec@redhat.com
-.TH ps_mem 1 "31 July 2013" "" ""
+.TH ps_mem 1 "04 October 2014" "" ""
 .SH NAME
 ps_mem \- Memory profiling tool
 .SH SYNOPSIS
-.B ps_mem
-[\-h|\-\-help] [\-s|\-\-split\-args] [\-p PID] [\-w N]
+.B ps_mem [OPTION]...
 .SH DESCRIPTION
 Display the core memory used per program (not per process)
 .br
@@ -14,7 +13,9 @@ In detail it reports:
 .br
 .PP
 .RS
-sum(private RAM for program processes) + sum(Shared RAM for program processes).
+sum (private RAM for program processes) +
+.br
+sum (shared RAM for program processes)
 .br
 .RE
 .PP
@@ -24,12 +25,15 @@ The shared RAM is problematic to calculate, and the tool automatically selects t
 \-h \-\-help
 Show help message
 .TP
+\-p PID[,PID2,...PIDN]
+Show memory consumption for the specified processes
+.TP
 \-s \-\-split\-args
 Show and separate memory usage entries by command line arguments
 and not just the program name.
 .TP
-\-p PID
-Show memory consumption of process with specified PID
+\-t \-\-total
+Only display the total number of bytes for the selected processes
 .TP
 \-w N
 Report memory consumption every N seconds
