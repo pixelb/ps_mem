@@ -291,12 +291,15 @@ def getCmdName(pid, split_args):
 
 #The following matches "du -h" output
 #see also human.py
-def human(num, power="Ki"):
-    powers = ["Ki", "Mi", "Gi", "Ti"]
-    while num >= 1000: #4 digits
-        num /= 1024.0
-        power = powers[powers.index(power)+1]
-    return "%.1f %s" % (num, power)
+def human(num, power="Ki", units=None):
+    if units is None:
+        powers = ["Ki", "Mi", "Gi", "Ti"]
+        while num >= 1000: #4 digits
+            num /= 1024.0
+            power = powers[powers.index(power)+1]
+        return "%.1f %sB" % (num, power)
+    else:
+        return "%.f" % ((num * 1024) / units)
 
 
 def cmd_with_count(cmd, count):
@@ -424,12 +427,12 @@ def print_header():
 
 def print_memory_usage(sorted_cmds, shareds, count, total):
     for cmd in sorted_cmds:
-        sys.stdout.write("%8sB + %8sB = %8sB\t%s\n" %
+        sys.stdout.write("%9s + %9s = %9s\t%s\n" %
                          (human(cmd[1]-shareds[cmd[0]]),
                           human(shareds[cmd[0]]), human(cmd[1]),
                           cmd_with_count(cmd[0], count[cmd[0]])))
     if have_pss:
-        sys.stdout.write("%s\n%s%8sB\n%s\n" %
+        sys.stdout.write("%s\n%s%9s\n%s\n" %
                          ("-" * 33, " " * 24, human(total), "=" * 33))
 
 def verify_environment():
@@ -464,7 +467,7 @@ if __name__ == '__main__':
             while sorted_cmds:
                 sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
                 if only_total and have_pss:
-                    sys.stdout.write(human(total).replace(' ','')+'B\n')
+                    sys.stdout.write(human(total, units=1)+'\n')
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total)
                 time.sleep(watch)
@@ -476,7 +479,7 @@ if __name__ == '__main__':
         # This is the default behavior
         sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
         if only_total and have_pss:
-            sys.stdout.write(human(total).replace(' ','')+'B\n')
+            sys.stdout.write(human(total, units=1)+'\n')
         elif not only_total:
             print_memory_usage(sorted_cmds, shareds, count, total)
 
