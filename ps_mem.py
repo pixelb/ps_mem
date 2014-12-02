@@ -321,12 +321,12 @@ def cmd_with_count(cmd, count):
 def shared_val_accuracy():
     """http://wiki.apache.org/spamassassin/TopSharedMemoryBug"""
     kv = kernel_ver()
+    pid = os.getpid()
     if kv[:2] == (2,4):
         if proc.open('meminfo').read().find("Inact_") == -1:
             return 1
         return 0
     elif kv[:2] == (2,6):
-        pid = os.getpid()
         if os.path.exists(proc.path(pid, 'smaps')):
             if proc.open(pid, 'smaps').read().find("Pss:")!=-1:
                 return 2
@@ -335,7 +335,7 @@ def shared_val_accuracy():
         if (2,6,1) <= kv <= (2,6,9):
             return -1
         return 0
-    elif kv[0] > 2:
+    elif kv[0] > 2 and os.path.exists(proc.path(pid, 'smaps')):
         return 2
     else:
         return 1
