@@ -140,8 +140,8 @@ proc = Proc()
 
 def parse_options():
     try:
-        long_options = ['split-args', 'help', 'total']
-        opts, args = getopt.getopt(sys.argv[1:], "shtp:w:", long_options)
+        long_options = ['split-args', 'help', 'total', 'use-bytes']
+        opts, args = getopt.getopt(sys.argv[1:], "shbtp:w:", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
@@ -155,12 +155,15 @@ def parse_options():
     pids_to_show = None
     watch = None
     only_total = False
+    use_bytes_as_unit = False
 
     for o, a in opts:
         if o in ('-s', '--split-args'):
             split_args = True
         if o in ('-t', '--total'):
             only_total = True
+        if o in ('-b', '--use-bytes'):
+            use_bytes_as_unit = True
         if o in ('-h', '--help'):
             sys.stdout.write(help())
             sys.exit(0)
@@ -177,12 +180,13 @@ def parse_options():
                 sys.stderr.write(help())
                 sys.exit(3)
 
-    return (split_args, pids_to_show, watch, only_total)
+    return (split_args, pids_to_show, watch, only_total, use_bytes_as_unit)
 
 def help():
     help_msg = 'Usage: ps_mem [OPTION]...\n' \
     'Show program core memory usage\n' \
     '\n' \
+    '  -b, --use-bytes             Use bytes as memory unit\n' \
     '  -h, -help                   Show this help\n' \
     '  -p <pid>[,pid2,...pidN]     Only show memory usage PIDs in the specified list\n' \
     '  -s, --split-args            Show and separate by, all command line arguments\n' \
@@ -296,7 +300,9 @@ def getCmdName(pid, split_args):
 
 #The following matches "du -h" output
 #see also human.py
-def human(num, power="Ki", units=None):
+def human(num, power="Ki", units=None, use_bytes_as_unit=False):
+    if use_bytes_as_unit is True:
+        return int(round(num))
     if units is None:
         powers = ["Ki", "Mi", "Gi", "Ti"]
         while num >= 1000: #4 digits
@@ -430,15 +436,15 @@ def get_memory_usage( pids_to_show, split_args, include_self=False, only_self=Fa
 def print_header():
     sys.stdout.write(" Private  +   Shared  =  RAM used\tProgram\n\n")
 
-def print_memory_usage(sorted_cmds, shareds, count, total):
+def print_memory_usage(sorted_cmds, shareds, count, total, use_bytes_as_unit):
     for cmd in sorted_cmds:
         sys.stdout.write("%9s + %9s = %9s\t%s\n" %
-                         (human(cmd[1]-shareds[cmd[0]]),
-                          human(shareds[cmd[0]]), human(cmd[1]),
+                         (human(cmd[1]-shareds[cmd[0]], use_bytes_as_unit=use_bytes_as_unit),
+                          human(shareds[cmd[0]], use_bytes_as_unit=use_bytes_as_unit), human(cmd[1], use_bytes_as_unit=use_bytes_as_unit),
                           cmd_with_count(cmd[0], count[cmd[0]])))
     if have_pss:
         sys.stdout.write("%s\n%s%9s\n%s\n" %
-                         ("-" * 33, " " * 24, human(total), "=" * 33))
+                         ("-" * 33, " " * 24, human(total, use_bytes_as_unit=use_bytes_as_unit), "=" * 33))
 
 def verify_environment():
     if os.geteuid() != 0:
@@ -460,7 +466,7 @@ def verify_environment():
             raise
 
 if __name__ == '__main__':
-    split_args, pids_to_show, watch, only_total = parse_options()
+    split_args, pids_to_show, watch, only_total, use_bytes_as_unit = parse_options()
     verify_environment()
 
     if not only_total:
@@ -472,9 +478,9 @@ if __name__ == '__main__':
             while sorted_cmds:
                 sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
                 if only_total and have_pss:
-                    sys.stdout.write(human(total, units=1)+'\n')
+                    sys.stdout.write(human(total, units=1, use_bytes_as_unit=use_bytes_as_unit)+'\n')
                 elif not only_total:
-                    print_memory_usage(sorted_cmds, shareds, count, total)
+                    print_memory_usage(sorted_cmds, shareds, count, total, use_bytes_as_unit)
                 time.sleep(watch)
             else:
                 sys.stdout.write('Process does not exist anymore.\n')
@@ -484,9 +490,9 @@ if __name__ == '__main__':
         # This is the default behavior
         sorted_cmds, shareds, count, total = get_memory_usage( pids_to_show, split_args )
         if only_total and have_pss:
-            sys.stdout.write(human(total, units=1)+'\n')
+            sys.stdout.write(human(total, units=1, use_bytes_as_unit=use_bytes_as_unit)+'\n')
         elif not only_total:
-            print_memory_usage(sorted_cmds, shareds, count, total)
+            print_memory_usage(sorted_cmds, shareds, count, total, use_bytes_as_unit)
 
     # We must close explicitly, so that any EPIPE exception
     # is handled by our excepthook, rather than the default
