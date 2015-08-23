@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.3      24 Jun 2014
+# V3.4      23 Aug 2015
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -123,7 +123,10 @@ class Proc:
 
     def open(self, *args):
         try:
-            return open(self.path(*args))
+            if sys.version_info < (3,):
+                return open(self.path(*args))
+            else:
+                return open(self.path(*args), errors='ignore')
         except (IOError, OSError):
             val = sys.exc_info()[1]
             if (val.errno == errno.ENOENT or # kernel thread or process gone
@@ -224,7 +227,10 @@ def getMemStats(pid):
         for line in proc.open(pid, 'smaps').readlines(): #open
             # Note we checksum smaps as maps is usually but
             # not always different for separate processes.
-            digester.update(line.encode('latin1'))
+            if sys.version_info < (3,):
+                digester.update(line)
+            else:
+                digester.update(bytes(line,'latin1'))
             if line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
@@ -291,7 +297,10 @@ def getCmdName(pid, split_args):
         #one can have separated programs as follows:
         #584.0 KiB +   1.0 MiB =   1.6 MiB    mozilla-thunder (exe -> bash)
         # 56.0 MiB +  22.2 MiB =  78.2 MiB    mozilla-thunderbird-bin
-    return cmd
+    if sys.version_info < (3,):
+        return cmd
+    else:
+        return cmd.encode(errors='replace').decode()
 
 
 #The following matches "du -h" output
