@@ -78,6 +78,10 @@ import time
 import errno
 import os
 import sys
+from subprocess import check_output
+
+def get_pid(name):
+    return check_output(["pidof",name])
 
 try:
     # md5 module is deprecated on python 2.6
@@ -144,7 +148,7 @@ proc = Proc()
 def parse_options():
     try:
         long_options = ['split-args', 'help', 'total']
-        opts, args = getopt.getopt(sys.argv[1:], "shtp:w:", long_options)
+        opts, args = getopt.getopt(sys.argv[1:], "shtn:p:w:", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
@@ -167,6 +171,9 @@ def parse_options():
         if o in ('-h', '--help'):
             sys.stdout.write(help())
             sys.exit(0)
+        if o in ('-n'):
+            pid = get_pid(a).strip()
+            pids_to_show = [int(pid)]
         if o in ('-p',):
             try:
                 pids_to_show = [int(x) for x in a.split(',')]
@@ -188,6 +195,7 @@ def help():
     '\n' \
     '  -h, -help                   Show this help\n' \
     '  -p <pid>[,pid2,...pidN]     Only show memory usage PIDs in the specified list\n' \
+    '  -n <executable name>        Only show memory usage of the executable\n' \
     '  -s, --split-args            Show and separate by, all command line arguments\n' \
     '  -t, --total                 Show only the total value\n' \
     '  -w <N>                      Measure and show process memory every N seconds\n'
