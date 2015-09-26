@@ -78,6 +78,7 @@ import time
 import errno
 import os
 import sys
+import locale
 
 try:
     # md5 module is deprecated on python 2.6
@@ -224,13 +225,14 @@ def getMemStats(pid):
            * PAGESIZE)
     if os.path.exists(proc.path(pid, 'smaps')): #stat
         digester = md5_new()
+        encoding = locale.getlocale()[1] or 'latin1'
         for line in proc.open(pid, 'smaps').readlines(): #open
             # Note we checksum smaps as maps is usually but
             # not always different for separate processes.
             if sys.version_info < (3,):
                 digester.update(line)
             else:
-                digester.update(bytes(line,'latin1'))
+                digester.update(bytes(line, encoding))
             if line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
