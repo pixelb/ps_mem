@@ -79,16 +79,6 @@ import errno
 import os
 import sys
 
-try:
-    # md5 module is deprecated on python 2.6
-    # so try the newer hashlib first
-    import hashlib
-    md5_new = hashlib.md5
-except ImportError:
-    import md5
-    md5_new = md5.new
-
-
 # The following exits cleanly on Ctrl-C or EPIPE
 # while treating other exceptions as before.
 def std_exceptions(etype, value, tb):
@@ -223,14 +213,11 @@ def getMemStats(pid):
     Rss = (int(proc.open(pid, 'statm').readline().split()[1])
            * PAGESIZE)
     if os.path.exists(proc.path(pid, 'smaps')): #stat
-        digester = md5_new()
-        for line in proc.open(pid, 'smaps').readlines(): #open
-            # Note we checksum smaps as maps is usually but
-            # not always different for separate processes.
-            if sys.version_info < (3,):
-                digester.update(line)
-            else:
-                digester.update(bytes(line,'latin1'))
+        lines = proc.open(pid, 'smaps').readlines() #open
+        # Note we checksum smaps as maps is usually but
+        # not always different for separate processes.
+        mem_id = hash(''.join(lines))
+        for line in lines:
             if line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
@@ -238,7 +225,6 @@ def getMemStats(pid):
             elif line.startswith("Pss"):
                 have_pss = 1
                 Pss_lines.append(line)
-        mem_id = digester.hexdigest()
         Shared = sum([int(line.split()[1]) for line in Shared_lines])
         Private = sum([int(line.split()[1]) for line in Private_lines])
         #Note Shared + Private = Rss above
