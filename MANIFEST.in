@@ -1,0 +1,3 @@
+include README.md
+include ps_mem.1
+include LICENSE

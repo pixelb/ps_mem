@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.5      29 Sep 2015
+# V3.6      16 Oct 2015
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -438,9 +438,8 @@ def print_memory_usage(sorted_cmds, shareds, count, total):
 def verify_environment():
     if os.geteuid() != 0:
         sys.stderr.write("Sorry, root permission required.\n")
-        if __name__ == '__main__':
-            sys.stderr.close()
-            sys.exit(1)
+        sys.stderr.close()
+        sys.exit(1)
 
     try:
         kv = kernel_ver()
@@ -454,7 +453,7 @@ def verify_environment():
         else:
             raise
 
-if __name__ == '__main__':
+def main():
     split_args, pids_to_show, watch, only_total = parse_options()
     verify_environment()
 
@@ -490,3 +489,5 @@ if __name__ == '__main__':
 
     vm_accuracy = shared_val_accuracy()
     show_shared_val_accuracy( vm_accuracy, only_total )
+
+if __name__ == '__main__': main()
