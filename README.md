@@ -6,6 +6,12 @@ A utility to accurately report the core memory usage for a program
 Yes the name is a bit weird. coremem would be more appropriate,
 but for backwards compatible reasons the ps_mem name remains.
 
+Install:
+
+`pip install ps_mem` is supported, or rpm and deb packages
+are available for most distros.  Also the ps_mem.py script
+can be run directly.
+
 Usage:
 
 ```
