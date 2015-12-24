@@ -16,6 +16,7 @@ Usage:
 
 ```
 ps_mem [-h|--help] [-p PID,...] [-s|--split-args] [-t|--total] [-w N]
+       [-d|--discriminate-by-pid] [-S|--swap]
 ```
 
 Example output:
