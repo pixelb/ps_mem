@@ -465,10 +465,17 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
 
     # Total swaped mem for each program
     total_swap = 0
+<<<<<<< 26f3d76f6c53b237121017b14b5b9ddc9383ed68
 
     # Total swaped shared mem for each program
     total_shared_swap = 0
 
+=======
+
+    # Total swaped shared mem for each program
+    total_shared_swap = 0
+
+>>>>>>> Add Swap support as an option:
     # Add shared mem for each program
     total = 0
 
@@ -492,6 +499,7 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
     return sorted_cmds, shareds, count, total, swaps, shared_swaps, \
         total_swap, total_shared_swap
 
+<<<<<<< 26f3d76f6c53b237121017b14b5b9ddc9383ed68
 
 def print_header(show_swap, discriminate_by_pid):
     output_string = " Private  +   Shared  =  RAM used"
@@ -506,6 +514,22 @@ def print_header(show_swap, discriminate_by_pid):
     sys.stdout.write(output_string)
 
 
+=======
+
+def print_header(show_swap, discriminate_by_pid):
+    output_string = " Private  +   Shared  =  RAM used"
+    if show_swap:
+        if have_swap_pss:
+            output_string += " " * 5 + "Shared Swap"
+        output_string += "   Swap used"
+    output_string += "\tProgram"
+    if discriminate_by_pid:
+        output_string += "[pid]"
+    output_string += "\n\n"
+    sys.stdout.write(output_string)
+
+
+>>>>>>> Add Swap support as an option:
 def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
                        shared_swaps, total_shared_swap, show_swap):
     for cmd in sorted_cmds:
