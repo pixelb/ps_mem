@@ -15,7 +15,7 @@ can be run directly.
 Usage:
 
 ```
-ps_mem [-h|--help] [-p PID,...] [-s|--split-args] [-t|--total] [-w N]
+ps_mem [-h|--help] [-p PID,...] [-s|--split-args] [-t|--total] [-w N] [-d|--discriminate-by-pid] [-S|--swap]
 ```
 
 Example output:
@@ -47,3 +47,14 @@ for i in $(ps -e -o user= | sort | uniq); do
   printf '%-20s%10s\n' $i $(sudo ps_mem --total -p $(pgrep -d, -u $i))
 done
 ```
+
+*Added options*:
+
+-S | --swap  To show swap information of each program and the total
+             swap. It is recovered from /proc/<pid>/smaps. Also, if
+             the kernel supports SwapPss, it prints the Shared Swap
+             information of each Program (Note that Swap - SwapPss
+             is not Private Swap) and the total of Shared Swap.
+
+-d | --discriminate-by-pid  Discriminate by process id, and do not
+                            group by program
