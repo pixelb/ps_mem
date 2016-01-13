@@ -442,7 +442,7 @@ def verify_environment():
         sys.exit(1)
 
     try:
-        kv = kernel_ver()
+        kernel_ver()
     except (IOError, OSError):
         val = sys.exc_info()[1]
         if val.errno == errno.ENOENT:
