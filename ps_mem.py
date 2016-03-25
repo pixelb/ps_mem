@@ -469,6 +469,8 @@ def main():
                     sys.stdout.write(human(total, units=1)+'\n')
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total)
+
+                sys.stdout.flush()
                 time.sleep(watch)
             else:
                 sys.stdout.write('Process does not exist anymore.\n')
