@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.6      16 Oct 2015
+# V3.7      26 Mar 2016
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -469,6 +469,8 @@ def main():
                     sys.stdout.write(human(total, units=1)+'\n')
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total)
+
+                sys.stdout.flush()
                 time.sleep(watch)
             else:
                 sys.stdout.write('Process does not exist anymore.\n')
