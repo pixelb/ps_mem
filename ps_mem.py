@@ -139,7 +139,8 @@ def parse_options():
             'help',
             'total',
             'discriminate-by-pid',
-            'swap'
+            'swap',
+            'no-humanize'
         ]
         opts, args = getopt.getopt(sys.argv[1:], "shtdSp:w:", long_options)
     except getopt.GetoptError:
@@ -157,6 +158,7 @@ def parse_options():
     show_swap = False
     watch = None
     only_total = False
+    humanize = True
 
     for o, a in opts:
         if o in ('-s', '--split-args'):
@@ -182,6 +184,8 @@ def parse_options():
             except:
                 sys.stderr.write(help())
                 sys.exit(3)
+        if o in ('--no-humanize'):
+            humanize = False
 
     return (
         split_args,
@@ -189,9 +193,9 @@ def parse_options():
         watch,
         only_total,
         discriminate_by_pid,
-        show_swap
+        show_swap,
+        humanize
     )
-
 
 def help():
     help_msg = 'Usage: ps_mem [OPTION]...\n' \
@@ -505,24 +509,27 @@ def print_header(show_swap, discriminate_by_pid):
 
 
 def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
-                       shared_swaps, total_shared_swap, show_swap):
+                       shared_swaps, total_shared_swap, show_swap, humanize):
     for cmd in sorted_cmds:
 
         output_string = "%9s + %9s = %9s"
-        output_data = (human(cmd[1]-shareds[cmd[0]]),
-                       human(shareds[cmd[0]]), human(cmd[1]))
+        output_data = (cmd[1]-shareds[cmd[0]], shareds[cmd[0]], cmd[1])
+
         if show_swap:
             if have_swap_pss:
                 output_string += "\t%9s"
-                output_data += (human(shared_swaps[cmd[0]]),)
+                output_data += (shared_swaps[cmd[0]],)
             output_string += "   %9s"
-            output_data += (human(swaps[cmd[0]]),)
-        output_string += "\t%s\n"
+            output_data += (swaps[cmd[0]],)
+        if humanize:
+            output_data = tuple(human(ele) for ele in output_data)
+            output_string += "\t%s\n"
+        else:
+            output_string = ",".join("%s" for i in range(len(output_data))) + ",%s\n"
         output_data += (cmd_with_count(cmd[0], count[cmd[0]]),)
-
         sys.stdout.write(output_string % output_data)
 
-    if have_pss:
+    if have_pss and humanize:
         if show_swap:
             if have_swap_pss:
                 sys.stdout.write("%s\n%s%9s%s%9s%s%9s\n%s\n" %
@@ -536,7 +543,6 @@ def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
         else:
             sys.stdout.write("%s\n%s%9s\n%s\n" %
                              ("-" * 33, " " * 24, human(total), "=" * 33))
-
 
 def verify_environment():
     try:
@@ -553,13 +559,12 @@ def verify_environment():
 
 def main():
     split_args, pids_to_show, watch, only_total, discriminate_by_pid, \
-    show_swap = parse_options()
+    show_swap, humanize = parse_options()
 
     verify_environment()
 
-    if not only_total:
+    if not only_total and humanize:
         print_header(show_swap, discriminate_by_pid)
-
     if watch is not None:
         try:
             sorted_cmds = True
@@ -573,8 +578,7 @@ def main():
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total,
                                        swaps, total_swap, shared_swaps,
-                                       total_shared_swap, show_swap)
-
+                                       total_shared_swap, show_swap, humanize)
                 sys.stdout.flush()
                 time.sleep(watch)
             else:
@@ -591,7 +595,7 @@ def main():
         elif not only_total:
             print_memory_usage(sorted_cmds, shareds, count, total, swaps,
                                total_swap, shared_swaps, total_shared_swap,
-                               show_swap)
+                               show_swap, humanize)
 
     # We must close explicitly, so that any EPIPE exception
     # is handled by our excepthook, rather than the default
@@ -601,4 +605,5 @@ def main():
     vm_accuracy = shared_val_accuracy()
     show_shared_val_accuracy( vm_accuracy, only_total )
 
-if __name__ == '__main__': main()
+if __name__ == '__main__':
+    main()
