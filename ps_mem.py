@@ -539,11 +539,6 @@ def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
 
 
 def verify_environment():
-    if os.geteuid() != 0:
-        sys.stderr.write("Sorry, root permission required.\n")
-        sys.stderr.close()
-        sys.exit(1)
-
     try:
         kernel_ver()
     except (IOError, OSError):
