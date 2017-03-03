@@ -121,7 +121,8 @@ class Proc:
         except (IOError, OSError):
             val = sys.exc_info()[1]
             if (val.errno == errno.ENOENT or # kernel thread or process gone
-                val.errno == errno.EPERM):
+                val.errno == errno.EPERM or
+                val.errno == errno.EACCES):
                 raise LookupError
             raise
 
@@ -302,7 +303,8 @@ def getCmdName(pid, split_args, discriminate_by_pid):
     except OSError:
         val = sys.exc_info()[1]
         if (val.errno == errno.ENOENT or # either kernel thread or process gone
-            val.errno == errno.EPERM):
+            val.errno == errno.EPERM or
+            val.errno == errno.EACCES):
             raise LookupError
         raise
 
@@ -538,9 +540,9 @@ def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
                              ("-" * 33, " " * 24, human(total), "=" * 33))
 
 
-def verify_environment():
-    if os.geteuid() != 0:
-        sys.stderr.write("Sorry, root permission required.\n")
+def verify_environment(pids_to_show):
+    if os.geteuid() != 0 and not pids_to_show:
+        sys.stderr.write("Sorry, root permission required, or specify pids with -p\n")
         sys.stderr.close()
         sys.exit(1)
 
@@ -560,7 +562,7 @@ def main():
     split_args, pids_to_show, watch, only_total, discriminate_by_pid, \
     show_swap = parse_options()
 
-    verify_environment()
+    verify_environment(pids_to_show)
 
     if not only_total:
         print_header(show_swap, discriminate_by_pid)
