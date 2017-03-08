@@ -309,7 +309,7 @@ def getCmdName(pid, split_args, discriminate_by_pid):
         raise
 
     if split_args:
-        return " ".join(cmdline)
+        return ' '.join(cmdline).replace('\n', ' ')
     if path.endswith(" (deleted)"):
         path = path[:-10]
         if os.path.exists(path):
