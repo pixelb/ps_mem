@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.9      07 Mar 2017
+# V3.10     09 Sep 2017
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -230,7 +230,7 @@ def kernel_ver():
     return (int(kv[0]), int(kv[1]), int(kv[2]))
 
 
-#return Private,Shared
+#return Private,Shared,Swap(Pss),unique_id
 #Note shared is always a subset of rss (trs is not always)
 def getMemStats(pid):
     global have_pss
@@ -273,12 +273,13 @@ def getMemStats(pid):
             pss_adjust = 0.5 # add 0.5KiB as this avg error due to truncation
             Pss = sum([float(line.split()[1])+pss_adjust for line in Pss_lines])
             Shared = Pss - Private
-        # Note that Swap = Private swap + Shared swap.
-        Swap = sum([int(line.split()[1]) for line in Swap_lines])
         if have_swap_pss:
             # The kernel supports SwapPss, that shows proportional swap share.
             # Note that Swap - SwapPss is not Private Swap.
-            Swap_pss = sum([int(line.split()[1]) for line in Swap_pss_lines])
+            Swap = sum([int(line.split()[1]) for line in Swap_pss_lines])
+        else:
+            # Note that Swap = Private swap + Shared swap.
+            Swap = sum([int(line.split()[1]) for line in Swap_lines])
     elif (2,6,1) <= kernel_ver() <= (2,6,9):
         Shared = 0 #lots of overestimation, but what can we do?
         Private = Rss
@@ -286,7 +287,7 @@ def getMemStats(pid):
         Shared = int(proc.open(pid, 'statm').readline().split()[2])
         Shared *= PAGESIZE
         Private = Rss - Shared
-    return (Private, Shared, mem_id, Swap, Swap_pss)
+    return (Private, Shared, Swap, mem_id)
 
 
 def getCmdName(pid, split_args, discriminate_by_pid):
@@ -357,56 +358,84 @@ def cmd_with_count(cmd, count):
         return cmd
 
 #Warn of possible inaccuracies
+#RAM:
 #2 = accurate & can total
 #1 = accurate only considering each process in isolation
 #0 = some shared mem not reported
 #-1= all shared mem not reported
-def shared_val_accuracy():
+#SWAP:
+#2 = accurate & can total
+#1 = accurate only considering each process in isolation
+#-1= not available
+def val_accuracy(show_swap):
     """http://wiki.apache.org/spamassassin/TopSharedMemoryBug"""
     kv = kernel_ver()
     pid = os.getpid()
+    swap_accuracy = -1
     if kv[:2] == (2,4):
         if proc.open('meminfo').read().find("Inact_") == -1:
-            return 1
-        return 0
+            return 1, swap_accuracy
+        return 0, swap_accuracy
     elif kv[:2] == (2,6):
         if os.path.exists(proc.path(pid, 'smaps')):
+            swap_accuracy = 1
             if proc.open(pid, 'smaps').read().find("Pss:")!=-1:
-                return 2
+                return 2, swap_accuracy
             else:
-                return 1
+                return 1, swap_accuracy
         if (2,6,1) <= kv <= (2,6,9):
-            return -1
-        return 0
+            return -1, swap_accuracy
+        return 0, swap_accuracy
     elif kv[0] > 2 and os.path.exists(proc.path(pid, 'smaps')):
-        return 2
+        if show_swap and proc.open(pid, 'smaps').read().find("SwapPss:")!=-1:
+            swap_accuracy = 2
+        return 2, swap_accuracy
     else:
-        return 1
+        return 1, swap_accuracy
 
-def show_shared_val_accuracy( possible_inacc, only_total=False ):
+def show_val_accuracy( ram_inacc, swap_inacc, only_total, show_swap ):
     level = ("Warning","Error")[only_total]
-    if possible_inacc == -1:
+
+    # Only show significant warnings
+    if only_total:
+        if show_swap: ram_inacc = 2
+        else: swap_inacc = 2
+
+    if ram_inacc == -1:
         sys.stderr.write(
          "%s: Shared memory is not reported by this system.\n" % level
         )
         sys.stderr.write(
          "Values reported will be too large, and totals are not reported\n"
         )
-    elif possible_inacc == 0:
+    elif ram_inacc == 0:
         sys.stderr.write(
          "%s: Shared memory is not reported accurately by this system.\n" % level
         )
         sys.stderr.write(
          "Values reported could be too large, and totals are not reported\n"
         )
-    elif possible_inacc == 1:
+    elif ram_inacc == 1:
         sys.stderr.write(
          "%s: Shared memory is slightly over-estimated by this system\n"
          "for each program, so totals are not reported.\n" % level
         )
+
+    if swap_inacc == -1:
+        sys.stderr.write(
+         "%s: Swap is not reported by this system.\n" % level
+        )
+    elif swap_inacc == 1:
+        sys.stderr.write(
+         "%s: Swap is over-estimated by this system for each program,\n"
+         "so totals are not reported.\n" % level
+        )
+
     sys.stderr.close()
-    if only_total and possible_inacc != 2:
-        sys.exit(1)
+    if only_total:
+        accuracy = swap_inacc if show_swap else ram_inacc
+        if accuracy != 2:
+            sys.exit(1)
 
 
 def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
@@ -416,7 +445,6 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
     mem_ids = {}
     count = {}
     swaps = {}
-    shared_swaps = {}
     for pid in os.listdir(proc.path('')):
         if not pid.isdigit():
             continue
@@ -439,7 +467,7 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
             continue
 
         try:
-            private, shared, mem_id, swap, swap_pss = getMemStats(pid)
+            private, shared, swap, mem_id = getMemStats(pid)
         except RuntimeError:
             continue #process gone
         if shareds.get(cmd):
@@ -458,16 +486,9 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
 
         # Swap (overcounting for now...)
         swaps[cmd] = swaps.setdefault(cmd, 0) + swap
-        if have_swap_pss:
-            shared_swaps[cmd] = shared_swaps.setdefault(cmd, 0) + swap_pss
-        else:
-            shared_swaps[cmd] = 0
 
     # Total swaped mem for each program
     total_swap = 0
-
-    # Total swaped shared mem for each program
-    total_shared_swap = 0
 
     # Add shared mem for each program
     total = 0
@@ -483,21 +504,15 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
         cmds[cmd] = cmds[cmd] + shareds[cmd]
         total += cmds[cmd]  # valid if PSS available
         total_swap += swaps[cmd]
-        if have_swap_pss:
-            total_shared_swap += shared_swaps[cmd]
 
     sorted_cmds = sorted(cmds.items(), key=lambda x:x[1])
     sorted_cmds = [x for x in sorted_cmds if x[1]]
 
-    return sorted_cmds, shareds, count, total, swaps, shared_swaps, \
-        total_swap, total_shared_swap
-
+    return sorted_cmds, shareds, count, total, swaps, total_swap
 
 def print_header(show_swap, discriminate_by_pid):
     output_string = " Private  +   Shared  =  RAM used"
     if show_swap:
-        if have_swap_pss:
-            output_string += " " * 5 + "Shared Swap"
         output_string += "   Swap used"
     output_string += "\tProgram"
     if discriminate_by_pid:
@@ -507,16 +522,13 @@ def print_header(show_swap, discriminate_by_pid):
 
 
 def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
-                       shared_swaps, total_shared_swap, show_swap):
+                       show_swap):
     for cmd in sorted_cmds:
 
         output_string = "%9s + %9s = %9s"
         output_data = (human(cmd[1]-shareds[cmd[0]]),
                        human(shareds[cmd[0]]), human(cmd[1]))
         if show_swap:
-            if have_swap_pss:
-                output_string += "\t%9s"
-                output_data += (human(shared_swaps[cmd[0]]),)
             output_string += "   %9s"
             output_data += (human(swaps[cmd[0]]),)
         output_string += "\t%s\n"
@@ -524,20 +536,14 @@ def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
 
         sys.stdout.write(output_string % output_data)
 
-    if have_pss:
-        if show_swap:
-            if have_swap_pss:
-                sys.stdout.write("%s\n%s%9s%s%9s%s%9s\n%s\n" %
-                                 ("-" * 61, " " * 24, human(total), " " * 7,
-                                  human(total_shared_swap), " " * 3,
-                                  human(total_swap), "=" * 61))
-            else:
-                sys.stdout.write("%s\n%s%9s%s%9s\n%s\n" %
-                                 ("-" * 45, " " * 24, human(total), " " * 3,
-                                  human(total_swap), "=" * 45))
-        else:
-            sys.stdout.write("%s\n%s%9s\n%s\n" %
-                             ("-" * 33, " " * 24, human(total), "=" * 33))
+    # Only show totals if appropriate
+    if have_swap_pss and show_swap:  # kernel will have_pss
+        sys.stdout.write("%s\n%s%9s%s%9s\n%s\n" %
+                         ("-" * 45, " " * 24, human(total), " " * 3,
+                          human(total_swap), "=" * 45))
+    elif have_pss:
+        sys.stdout.write("%s\n%s%9s\n%s\n" %
+                         ("-" * 33, " " * 24, human(total), "=" * 33))
 
 
 def verify_environment(pids_to_show):
@@ -571,16 +577,16 @@ def main():
         try:
             sorted_cmds = True
             while sorted_cmds:
-                sorted_cmds, shareds, count, total, swaps, shared_swaps, \
-                    total_swap, total_shared_swap = \
+                sorted_cmds, shareds, count, total, swaps, total_swap = \
                     get_memory_usage(pids_to_show, split_args,
                                      discriminate_by_pid)
-                if only_total and have_pss:
+                if only_total and show_swap and have_swap_pss:
+                    sys.stdout.write(human(total_swap, units=1)+'\n')
+                elif only_total and not show_swap and have_pss:
                     sys.stdout.write(human(total, units=1)+'\n')
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total,
-                                       swaps, total_swap, shared_swaps,
-                                       total_shared_swap, show_swap)
+                                       swaps, total_swap, show_swap)
 
                 sys.stdout.flush()
                 time.sleep(watch)
@@ -590,22 +596,23 @@ def main():
             pass
     else:
         # This is the default behavior
-        sorted_cmds, shareds, count, total, swaps, shared_swaps, total_swap, \
-            total_shared_swap = get_memory_usage(pids_to_show, split_args,
-                                                 discriminate_by_pid)
-        if only_total and have_pss:
+        sorted_cmds, shareds, count, total, swaps, total_swap = \
+            get_memory_usage(pids_to_show, split_args,
+                             discriminate_by_pid)
+        if only_total and show_swap and have_swap_pss:
+            sys.stdout.write(human(total_swap, units=1)+'\n')
+        elif only_total and not show_swap and have_pss:
             sys.stdout.write(human(total, units=1)+'\n')
         elif not only_total:
             print_memory_usage(sorted_cmds, shareds, count, total, swaps,
-                               total_swap, shared_swaps, total_shared_swap,
-                               show_swap)
+                               total_swap, show_swap)
 
     # We must close explicitly, so that any EPIPE exception
     # is handled by our excepthook, rather than the default
     # one which is reenabled after this script finishes.
     sys.stdout.close()
 
-    vm_accuracy = shared_val_accuracy()
-    show_shared_val_accuracy( vm_accuracy, only_total )
+    ram_accuracy, swap_accuracy = val_accuracy( show_swap )
+    show_val_accuracy( ram_accuracy, swap_accuracy, only_total, show_swap )
 
 if __name__ == '__main__': main()
