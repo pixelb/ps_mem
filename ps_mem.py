@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.10     09 Sep 2017
+# V3.11     17 Sep 2017
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -245,10 +245,12 @@ def getMemStats(pid):
     Swap_pss_lines = []
 
     Swap = 0
-    Swap_pss = 0
 
     if os.path.exists(proc.path(pid, 'smaps')):  # stat
-        lines = proc.open(pid, 'smaps').readlines()  # open
+        smaps = 'smaps'
+        if os.path.exists(proc.path(pid, 'smaps_rollup')):
+            smaps = 'smaps_rollup' # faster to process
+        lines = proc.open(pid, smaps).readlines()  # open
         # Note we checksum smaps as maps is usually but
         # not always different for separate processes.
         mem_id = hash(''.join(lines))
