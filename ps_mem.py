@@ -142,7 +142,7 @@ def parse_options():
             'discriminate-by-pid',
             'swap'
         ]
-        opts, args = getopt.getopt(sys.argv[1:], "shtdSp:w:", long_options)
+        opts, args = getopt.getopt(sys.argv[1:], "shtdSp:w:n:", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
@@ -158,6 +158,7 @@ def parse_options():
     show_swap = False
     watch = None
     only_total = False
+    names = None;
 
     for o, a in opts:
         if o in ('-s', '--split-args'):
@@ -183,6 +184,16 @@ def parse_options():
             except:
                 sys.stderr.write(help())
                 sys.exit(3)
+        if o in ('-n'): # Get memory usage by name
+            try:
+                names = [x for x in a.split(',')]
+            except:
+                sys.stderr.write(help())
+                sys.exit(3)
+
+    if names is not None and pids_to_show is not None:
+        sys.stderr.write(help())
+        sys.exit(3)
 
     return (
         split_args,
@@ -190,7 +201,8 @@ def parse_options():
         watch,
         only_total,
         discriminate_by_pid,
-        show_swap
+        show_swap,
+        names
     )
 
 
@@ -207,8 +219,8 @@ def help():
         '  -d, --discriminate-by-pid   Show by process rather than by program\n' \
         '  -S, --swap                  Show swap information\n' \
         '  -w <N>                      Measure and show process memory every'\
-        ' N seconds\n'
-
+        ' N seconds\n' \
+        ' -n <process name>[,p2,...pN] Measure process memory from the given list\n'
     return help_msg
 
 
@@ -440,7 +452,7 @@ def show_val_accuracy( ram_inacc, swap_inacc, only_total, show_swap ):
             sys.exit(1)
 
 
-def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
+def get_memory_usage(pids_to_show, split_args, discriminate_by_pid, names,
                      include_self=False, only_self=False):
     cmds = {}
     shareds = {}
@@ -466,6 +478,10 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
             #operation not permitted
             #kernel threads don't have exe links or
             #process gone
+            continue
+
+        # filter for -n
+        if names is not None and cmd not in names:
             continue
 
         try:
@@ -568,7 +584,7 @@ def verify_environment(pids_to_show):
 
 def main():
     split_args, pids_to_show, watch, only_total, discriminate_by_pid, \
-    show_swap = parse_options()
+    show_swap, names = parse_options()
 
     verify_environment(pids_to_show)
 
@@ -581,7 +597,7 @@ def main():
             while sorted_cmds:
                 sorted_cmds, shareds, count, total, swaps, total_swap = \
                     get_memory_usage(pids_to_show, split_args,
-                                     discriminate_by_pid)
+                                     discriminate_by_pid, names)
                 if only_total and show_swap and have_swap_pss:
                     sys.stdout.write(human(total_swap, units=1)+'\n')
                 elif only_total and not show_swap and have_pss:
@@ -600,7 +616,7 @@ def main():
         # This is the default behavior
         sorted_cmds, shareds, count, total, swaps, total_swap = \
             get_memory_usage(pids_to_show, split_args,
-                             discriminate_by_pid)
+                             discriminate_by_pid, names)
         if only_total and show_swap and have_swap_pss:
             sys.stdout.write(human(total_swap, units=1)+'\n')
         elif only_total and not show_swap and have_pss:
