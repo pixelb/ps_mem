@@ -435,7 +435,10 @@ def show_val_accuracy( ram_inacc, swap_inacc, only_total, show_swap ):
 
     sys.stderr.close()
     if only_total:
-        accuracy = swap_inacc if show_swap else ram_inacc
+        if show_swap:
+            accuracy = swap_inacc
+        else:
+            accuracy = ram_inacc
         if accuracy != 2:
             sys.exit(1)
 
