@@ -389,6 +389,7 @@ def val_accuracy(show_swap):
             return -1, swap_accuracy
         return 0, swap_accuracy
     elif kv[0] > 2 and os.path.exists(proc.path(pid, 'smaps')):
+        swap_accuracy = 1
         if show_swap and proc.open(pid, 'smaps').read().find("SwapPss:")!=-1:
             swap_accuracy = 2
         return 2, swap_accuracy
@@ -399,9 +400,10 @@ def show_val_accuracy( ram_inacc, swap_inacc, only_total, show_swap ):
     level = ("Warning","Error")[only_total]
 
     # Only show significant warnings
-    if only_total:
-        if show_swap: ram_inacc = 2
-        else: swap_inacc = 2
+    if not show_swap:
+        swap_inacc = 2
+    elif only_total:
+        ram_inacc = 2
 
     if ram_inacc == -1:
         sys.stderr.write(
