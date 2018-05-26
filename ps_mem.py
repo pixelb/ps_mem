@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.11     17 Sep 2017
+# V3.12     25 May 2018
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -138,6 +138,7 @@ def parse_options():
         long_options = [
             'split-args',
             'help',
+            'version',
             'total',
             'discriminate-by-pid',
             'swap'
@@ -170,6 +171,9 @@ def parse_options():
             show_swap = True
         if o in ('-h', '--help'):
             sys.stdout.write(help())
+            sys.exit(0)
+        if o in ('--version'):
+            sys.stdout.write('3.12'+'\n')
             sys.exit(0)
         if o in ('-p',):
             try:

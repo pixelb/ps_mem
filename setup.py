@@ -9,7 +9,7 @@ def read(fname):
 
 setup(
     name="ps_mem",
-    version="3.8",
+    version="3.12",
     author="Pádraig Brady",
     author_email="P@draigBrady.com",
     description=("A utility to report core memory usage per program"),
@@ -17,6 +17,7 @@ setup(
     keywords="memory RAM profile program linux",
     url="http://github.com/pixelb/ps_mem",
     long_description=read('README.md'),
+    long_description_content_type='text/markdown',
     classifiers=[
         "Development Status :: 5 - Production/Stable",
         "Topic :: Utilities",
