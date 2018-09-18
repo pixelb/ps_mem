@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.12     25 May 2018
+# V3.13     17 Sep 2018
 #   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
 
 # Notes:
@@ -173,7 +173,7 @@ def parse_options():
             sys.stdout.write(help())
             sys.exit(0)
         if o in ('--version'):
-            sys.stdout.write('3.12'+'\n')
+            sys.stdout.write('3.13'+'\n')
             sys.exit(0)
         if o in ('-p',):
             try:
@@ -296,7 +296,7 @@ def getMemStats(pid):
     return (Private, Shared, Swap, mem_id)
 
 
-def getCmdName(pid, split_args, discriminate_by_pid):
+def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
     cmdline = proc.open(pid, 'cmdline').read().split("\0")
     if cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
@@ -330,13 +330,29 @@ def getCmdName(pid, split_args, discriminate_by_pid):
             else:
                 path += " [deleted]"
     exe = os.path.basename(path)
-    cmd = proc.open(pid, 'status').readline()[6:-1]
+    if exe_only: return exe
+
+    proc_status = proc.open(pid, 'status').readlines()
+    cmd = proc_status[0][6:-1]
     if exe.startswith(cmd):
         cmd = exe #show non truncated version
         #Note because we show the non truncated name
         #one can have separated programs as follows:
         #584.0 KiB +   1.0 MiB =   1.6 MiB    mozilla-thunder (exe -> bash)
         # 56.0 MiB +  22.2 MiB =  78.2 MiB    mozilla-thunderbird-bin
+    else:
+        #Lookup the parent's exe and use that if matching
+        #which will merge "Web Content" with "firefox" for example
+        ppid = 0
+        for l in range(10):
+            ps_line = proc_status[l]
+            if ps_line.startswith('PPid:'):
+                ppid = int(ps_line[6:-1])
+                break
+        if ppid:
+            p_exe = getCmdName(ppid, False, False, exe_only=True)
+            if exe == p_exe:
+                cmd = exe
     if sys.version_info >= (3,):
         cmd = cmd.encode(errors='replace').decode()
     if discriminate_by_pid:
