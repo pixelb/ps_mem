@@ -101,6 +101,17 @@ our_pid = os.getpid()
 have_pss = 0
 have_swap_pss = 0
 
+class Unbuffered(object):
+   def __init__(self, stream):
+       self.stream = stream
+   def write(self, data):
+       self.stream.write(data)
+       self.stream.flush()
+   def close(self):
+       self.stream.close()
+   def flush(self):
+      self.stream.flush()
+
 class Proc:
     def __init__(self):
         uname = os.uname()
@@ -592,6 +603,10 @@ def verify_environment(pids_to_show):
             raise
 
 def main():
+    # Force the stdout and stderr streams to be unbuffered
+    sys.stdout = Unbuffered(sys.stdout)
+    sys.stderr = Unbuffered(sys.stderr)
+
     split_args, pids_to_show, watch, only_total, discriminate_by_pid, \
     show_swap = parse_options()
 
