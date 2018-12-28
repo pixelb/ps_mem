@@ -73,11 +73,11 @@
 # FreeBSD is supported if linprocfs is mounted at /compat/linux/proc/
 # FreeBSD 8.0 supports up to a level of Linux 2.6.16
 
-import getopt
 import time
 import errno
 import os
 import sys
+import argparse
 
 # The following exits cleanly on Ctrl-C or EPIPE
 # while treating other exceptions as before.
@@ -145,72 +145,59 @@ proc = Proc()
 #
 
 def parse_options():
-    try:
-        long_options = [
-            'split-args',
-            'help',
-            'version',
-            'total',
-            'discriminate-by-pid',
-            'swap'
-        ]
-        opts, args = getopt.getopt(sys.argv[1:], "shtdSp:w:", long_options)
-    except getopt.GetoptError:
-        sys.stderr.write(help())
-        sys.exit(3)
+    """
+    Parses options given after program call.
 
-    if len(args):
-        sys.stderr.write("Extraneous arguments: %s\n" % args)
-        sys.exit(3)
+    Returns:
+        Tuple of:
+            split_args - type boolean,
+            pids_to_show - type list or nonetype,
+            watch - type float or nonetype,
+            total - type boolean,
+            discriminate_by_pid - type boolean,
+            swap - type boolean
+    """
+    # usage=help() to show full help message upon all errors.
+    parser = argparse.ArgumentParser(usage=help())
+    # Replace default argparse help format for calls to '-h'.
+    # Adds 'usage: ' because calls to '-h' option does not add it.
+    parser.format_help = lambda: 'usage: ' + help()
 
-    # ps_mem.py options
-    split_args = False
-    pids_to_show = None
-    discriminate_by_pid = False
-    show_swap = False
-    watch = None
-    only_total = False
+    parser.add_argument('--version', action='version', version='3.13')
+    parser.add_argument('-s', '--split-args', action='store_true')
+    parser.add_argument('-t', '--total', action='store_true')
+    parser.add_argument('-d', '--discriminate-by-pid', action='store_true')
+    parser.add_argument('-S', '--swap', action='store_true')
+    parser.add_argument('-p', '--pids_to_show', type=str)
+    parser.add_argument('-w', '--watch', nargs='?', const=2, type=float)
 
-    for o, a in opts:
-        if o in ('-s', '--split-args'):
-            split_args = True
-        if o in ('-t', '--total'):
-            only_total = True
-        if o in ('-d', '--discriminate-by-pid'):
-            discriminate_by_pid = True
-        if o in ('-S', '--swap'):
-            show_swap = True
-        if o in ('-h', '--help'):
-            sys.stdout.write(help())
-            sys.exit(0)
-        if o in ('--version'):
-            sys.stdout.write('3.13'+'\n')
-            sys.exit(0)
-        if o in ('-p',):
-            try:
-                pids_to_show = [int(x) for x in a.split(',')]
-            except:
+    options = parser.parse_args()
+    # Convert string of '<pid1>, <pid2>,..<pidN>' to list.
+    if options.pids_to_show is not None:
+        try:
+            options.pids_to_show = [int(pid) for pid in
+                                    options.pids_to_show.split(',')]
+        except:
                 sys.stderr.write(help())
                 sys.exit(3)
-        if o in ('-w',):
-            try:
-                watch = int(a)
-            except:
-                sys.stderr.write(help())
-                sys.exit(3)
+
+    if options.watch is not None:
+        if options.watch < 0:
+            sys.stderr.write(help())
+            sys.exit(3)
 
     return (
-        split_args,
-        pids_to_show,
-        watch,
-        only_total,
-        discriminate_by_pid,
-        show_swap
+        options.split_args,
+        options.pids_to_show,
+        options.watch,
+        options.total,
+        options.discriminate_by_pid,
+        options.swap
     )
 
 
 def help():
-    help_msg = 'Usage: ps_mem [OPTION]...\n' \
+    help_msg = 'ps_mem [OPTION]...\n' \
         'Show program core memory usage\n' \
         '\n' \
         '  -h, -help                   Show this help\n' \
