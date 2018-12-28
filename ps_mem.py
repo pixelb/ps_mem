@@ -146,12 +146,12 @@ proc = Proc()
 
 def parse_options():
     """
-    Parses options given after program call.
+    Parses any options given after calling the program.
 
     Returns:
-        Tuple of:
+        Tuple with elements:
             split_args - type boolean,
-            pids_to_show - type list or nonetype,
+            pids_to_show - type list of ints or nonetype,
             watch - type float or nonetype,
             total - type boolean,
             discriminate_by_pid - type boolean,
@@ -172,7 +172,7 @@ def parse_options():
     parser.add_argument('-w', '--watch', nargs='?', const=2, type=float)
 
     options = parser.parse_args()
-    # Convert string of '<pid1>, <pid2>,..<pidN>' to list.
+    # Convert string of '<pid1>, <pid2>,..<pidN>' to list of ints.
     if options.pids_to_show is not None:
         try:
             options.pids_to_show = [int(pid) for pid in
