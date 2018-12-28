@@ -178,8 +178,8 @@ def parse_options():
             options.pids_to_show = [int(pid) for pid in
                                     options.pids_to_show.split(',')]
         except:
-                sys.stderr.write(help())
-                sys.exit(3)
+            sys.stderr.write(help())
+            sys.exit(3)
 
     if options.watch is not None:
         if options.watch < 0:
