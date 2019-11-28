@@ -130,6 +130,8 @@ class Proc:
             else:
                 return open(self.path(*args), errors='ignore')
         except (IOError, OSError):
+            if type(args[0]) is not int:
+                raise
             val = sys.exc_info()[1]
             if (val.errno == errno.ENOENT or # kernel thread or process gone
                 val.errno == errno.EPERM or
