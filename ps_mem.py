@@ -276,7 +276,7 @@ def getMemStats(pid):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
                 Private_lines.append(line)
-            elif line.startswith("Pss"):
+            elif line.startswith("Pss:"):
                 have_pss = 1
                 Pss_lines.append(line)
             elif line.startswith("Swap:"):
