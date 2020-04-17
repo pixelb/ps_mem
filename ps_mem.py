@@ -363,9 +363,13 @@ def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
                 ppid = int(ps_line[6:-1])
                 break
         if ppid:
-            p_exe = getCmdName(ppid, False, False, exe_only=True)
-            if exe == p_exe:
-                cmd = exe
+            try:
+                p_exe = getCmdName(ppid, False, False, exe_only=True)
+            except LookupError:
+                pass
+            else:
+                if exe == p_exe:
+                    cmd = exe
     if sys.version_info >= (3,):
         cmd = cmd.encode(errors='replace').decode()
     if discriminate_by_pid:
