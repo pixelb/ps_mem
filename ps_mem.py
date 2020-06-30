@@ -311,7 +311,7 @@ def getMemStats(pid):
 
 def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
     cmdline = proc.open(pid, 'cmdline').read().split("\0")
-    if cmdline[-1] == '' and len(cmdline) > 1:
+    while cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
 
     path = proc.path(pid, 'exe')
