@@ -154,9 +154,10 @@ def parse_options():
             'version',
             'total',
             'discriminate-by-pid',
-            'swap'
+            'swap',
+            'unit='
         ]
-        opts, args = getopt.getopt(sys.argv[1:], "shtdSp:w:", long_options)
+        opts, args = getopt.getopt(sys.argv[1:], "shtdSp:w:u:", long_options)
     except getopt.GetoptError:
         sys.stderr.write(help())
         sys.exit(3)
@@ -172,6 +173,7 @@ def parse_options():
     show_swap = False
     watch = None
     only_total = False
+    unit = None
 
     for o, a in opts:
         if o in ('-s', '--split-args'):
@@ -200,6 +202,20 @@ def parse_options():
             except:
                 sys.stderr.write(help())
                 sys.exit(3)
+        if o in ('-u', '--unit'):
+            if a in ['b', 'B']:
+                unit = 1.0
+            elif a in ['k', 'K']:
+                unit = 1024.0
+            elif a in ['m', 'M']:
+                unit = 1024.0 ** 2
+            elif a in ['g', 'G']:
+                unit = 1024.0 ** 3 
+            elif a in ['t', 'T']:
+                unit = 1024.0 ** 4
+            else:
+                sys.stderr.write(help())
+                sys.exit(3)
 
     return (
         split_args,
@@ -207,7 +223,8 @@ def parse_options():
         watch,
         only_total,
         discriminate_by_pid,
-        show_swap
+        show_swap,
+        unit
     )
 
 
@@ -215,7 +232,7 @@ def help():
     help_msg = 'Usage: ps_mem [OPTION]...\n' \
         'Show program core memory usage\n' \
         '\n' \
-        '  -h, -help                   Show this help\n' \
+        '  -h, --help                   Show this help\n' \
         '  -p <pid>[,pid2,...pidN]     Only show memory usage PIDs in the '\
         'specified list\n' \
         '  -s, --split-args            Show and separate by, all command line'\
@@ -224,7 +241,8 @@ def help():
         '  -d, --discriminate-by-pid   Show by process rather than by program\n' \
         '  -S, --swap                  Show swap information\n' \
         '  -w <N>                      Measure and show process memory every'\
-        ' N seconds\n'
+        ' N seconds\n' \
+        '  -u, --unit=<U>              Unit size. U are b,k,m,g,t (powers of 1024). Default unit is KiB.\n'
 
     return help_msg
 
@@ -380,14 +398,19 @@ def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
 #The following matches "du -h" output
 #see also human.py
 def human(num, power="Ki", units=None):
+    powers = ["Ki", "Mi", "Gi", "Ti"]
+
     if units is None:
-        powers = ["Ki", "Mi", "Gi", "Ti"]
         while num >= 1000: #4 digits
             num /= 1024.0
             power = powers[powers.index(power)+1]
         return "%.1f %sB" % (num, power)
     else:
-        return "%.f" % ((num * 1024) / units)
+        power = ""
+        for i in range(1, 5):
+            if units == 1024 ** i:
+                power = powers[int(i - 1)]
+        return "%.f %sB" % ((num * 1024) / units, power)
 
 
 def cmd_with_count(cmd, count):
@@ -566,15 +589,15 @@ def print_header(show_swap, discriminate_by_pid):
 
 
 def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
-                       show_swap):
+                       show_swap, unit):
     for cmd in sorted_cmds:
 
         output_string = "%9s + %9s = %9s"
-        output_data = (human(cmd[1]-shareds[cmd[0]]),
-                       human(shareds[cmd[0]]), human(cmd[1]))
+        output_data = (human(cmd[1]-shareds[cmd[0]], units=unit),
+                       human(shareds[cmd[0]], units=unit), human(cmd[1], units=unit))
         if show_swap:
             output_string += "   %9s"
-            output_data += (human(swaps[cmd[0]]),)
+            output_data += (human(swaps[cmd[0]], units=unit),)
         output_string += "\t%s\n"
         output_data += (cmd_with_count(cmd[0], count[cmd[0]]),)
 
@@ -583,11 +606,11 @@ def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
     # Only show totals if appropriate
     if have_swap_pss and show_swap:  # kernel will have_pss
         sys.stdout.write("%s\n%s%9s%s%9s\n%s\n" %
-                         ("-" * 45, " " * 24, human(total), " " * 3,
-                          human(total_swap), "=" * 45))
+                         ("-" * 45, " " * 24, human(total, units=unit), " " * 3,
+                          human(total_swap, units=unit), "=" * 45))
     elif have_pss:
         sys.stdout.write("%s\n%s%9s\n%s\n" %
-                         ("-" * 33, " " * 24, human(total), "=" * 33))
+                         ("-" * 33, " " * 24, human(total, units=unit), "=" * 33))
 
 
 def verify_environment(pids_to_show):
@@ -614,7 +637,7 @@ def main():
     sys.stderr = Unbuffered(sys.stderr)
 
     split_args, pids_to_show, watch, only_total, discriminate_by_pid, \
-    show_swap = parse_options()
+    show_swap, unit = parse_options()
 
     verify_environment(pids_to_show)
 
@@ -634,7 +657,7 @@ def main():
                     sys.stdout.write(human(total, units=1)+'\n')
                 elif not only_total:
                     print_memory_usage(sorted_cmds, shareds, count, total,
-                                       swaps, total_swap, show_swap)
+                                       swaps, total_swap, show_swap, unit)
 
                 sys.stdout.flush()
                 time.sleep(watch)
@@ -653,7 +676,7 @@ def main():
             sys.stdout.write(human(total, units=1)+'\n')
         elif not only_total:
             print_memory_usage(sorted_cmds, shareds, count, total, swaps,
-                               total_swap, show_swap)
+                               total_swap, show_swap, unit)
 
     # We must close explicitly, so that any EPIPE exception
     # is handled by our excepthook, rather than the default
