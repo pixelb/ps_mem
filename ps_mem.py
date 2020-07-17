@@ -181,6 +181,7 @@ def parse_options():
     parser.add_argument(
         '-w',
         dest='watch',
+        metavar='<N>',
         type=int,
         help='Measure and show process memory every N seconds',
     )
