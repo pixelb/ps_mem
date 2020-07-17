@@ -207,24 +207,6 @@ def parse_options():
     )
 
 
-def help():
-    help_msg = 'Usage: ps_mem [OPTION]...\n' \
-        'Show program core memory usage\n' \
-        '\n' \
-        '  -h, -help                   Show this help\n' \
-        '  -p <pid>[,pid2,...pidN]     Only show memory usage PIDs in the '\
-        'specified list\n' \
-        '  -s, --split-args            Show and separate by, all command line'\
-        ' arguments\n' \
-        '  -t, --total                 Show only the total value\n' \
-        '  -d, --discriminate-by-pid   Show by process rather than by program\n' \
-        '  -S, --swap                  Show swap information\n' \
-        '  -w <N>                      Measure and show process memory every'\
-        ' N seconds\n'
-
-    return help_msg
-
-
 # (major,minor,release)
 def kernel_ver():
     kv = proc.open('sys/kernel/osrelease').readline().split(".")[:3]
