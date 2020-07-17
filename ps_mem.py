@@ -149,7 +149,12 @@ proc = Proc()
 def parse_options():
     help_msg = 'Show program core memory usage.'
     parser = argparse.ArgumentParser(prog='ps_mem', description=help_msg)
-    parser.add_argument('--version', action='version', version='3.13')
+    parser.add_argument(
+        '--version',
+        action='version',
+        version='3.13',
+        help=argparse.SUPPRESS,
+    )
     parser.add_argument(
         '-s', '--split-args',
         action='store_true',
