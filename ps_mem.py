@@ -73,11 +73,11 @@
 # FreeBSD is supported if linprocfs is mounted at /compat/linux/proc/
 # FreeBSD 8.0 supports up to a level of Linux 2.6.16
 
-import getopt
 import time
 import errno
 import os
 import sys
+import argparse
 
 # The following exits cleanly on Ctrl-C or EPIPE
 # while treating other exceptions as before.
@@ -147,67 +147,63 @@ proc = Proc()
 #
 
 def parse_options():
-    try:
-        long_options = [
-            'split-args',
-            'help',
-            'version',
-            'total',
-            'discriminate-by-pid',
-            'swap'
-        ]
-        opts, args = getopt.getopt(sys.argv[1:], "shtdSp:w:", long_options)
-    except getopt.GetoptError:
-        sys.stderr.write(help())
-        sys.exit(3)
+    help_msg = 'Show program core memory usage.'
+    parser = argparse.ArgumentParser(prog='ps_mem', description=help_msg)
+    parser.add_argument('--version', action='version', version='3.13')
+    parser.add_argument(
+        '-s', '--split-args',
+        action='store_true',
+        help='Show and separate by, all command line arguments',
+    )
+    parser.add_argument(
+        '-t', '--total',
+        dest='only_total',
+        action='store_true',
+        help='Show only the total value',
+    )
+    parser.add_argument(
+        '-d', '--discriminate-by-pid',
+        action='store_true',
+        help='Show by process rather than by program',
+    )
+    parser.add_argument(
+        '-S', '--swap',
+        dest='show_swap',
+        action='store_true',
+        help='Show swap information',
+    )
+    parser.add_argument(
+        '-p',
+        dest='pids',
+        metavar='<pid>[,pid2,...pidN]',
+        help='Only show memory usage PIDs in the specified list',
+    )
+    parser.add_argument(
+        '-w',
+        dest='watch',
+        type=int,
+        help='Measure and show process memory every N seconds',
+    )
+    args = parser.parse_args()
 
-    if len(args):
-        sys.stderr.write("Extraneous arguments: %s\n" % args)
-        sys.exit(3)
+    args.pids_to_show = []
+    if args.pids:
+        try:
+            args.pids_to_show = [int(x) for x in args.pids.split(',')]
+        except ValueError:
+            parser.error('Invalid PID(s): %s' % args.pids)
 
-    # ps_mem.py options
-    split_args = False
-    pids_to_show = None
-    discriminate_by_pid = False
-    show_swap = False
-    watch = None
-    only_total = False
-
-    for o, a in opts:
-        if o in ('-s', '--split-args'):
-            split_args = True
-        if o in ('-t', '--total'):
-            only_total = True
-        if o in ('-d', '--discriminate-by-pid'):
-            discriminate_by_pid = True
-        if o in ('-S', '--swap'):
-            show_swap = True
-        if o in ('-h', '--help'):
-            sys.stdout.write(help())
-            sys.exit(0)
-        if o in ('--version'):
-            sys.stdout.write('3.13'+'\n')
-            sys.exit(0)
-        if o in ('-p',):
-            try:
-                pids_to_show = [int(x) for x in a.split(',')]
-            except:
-                sys.stderr.write(help())
-                sys.exit(3)
-        if o in ('-w',):
-            try:
-                watch = int(a)
-            except:
-                sys.stderr.write(help())
-                sys.exit(3)
+    if args.watch is not None:
+        if args.watch <= 0:
+            parser.error('Seconds must be positive! (%s)' % args.watch)
 
     return (
-        split_args,
-        pids_to_show,
-        watch,
-        only_total,
-        discriminate_by_pid,
-        show_swap
+        args.split_args,
+        args.pids_to_show,
+        args.watch,
+        args.only_total,
+        args.discriminate_by_pid,
+        args.show_swap,
     )
 
 
