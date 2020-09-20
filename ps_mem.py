@@ -139,6 +139,19 @@ class Proc:
                 raise LookupError
             raise
 
+    def stat(self, *args):
+        try:
+            return os.stat(self.path(*args))
+        except (IOError, OSError):
+            if type(args[0]) is not int:
+                raise
+            val = sys.exc_info()[1]
+            if (val.errno == errno.ENOENT or # kernel thread or process gone
+                val.errno == errno.EPERM or
+                val.errno == errno.EACCES):
+                raise LookupError
+            raise
+
 proc = Proc()
 
 
@@ -185,6 +198,12 @@ def parse_options():
         type=int,
         help='Measure and show process memory every N seconds',
     )
+    parser.add_argument(
+        '-u', '--user',
+        dest='user',
+        action='store_true',
+        help='Only show processes belonging to the current user',
+    )
     args = parser.parse_args()
 
     args.pids_to_show = []
@@ -205,6 +224,7 @@ def parse_options():
         args.only_total,
         args.discriminate_by_pid,
         args.show_swap,
+        args.user
     )
 
 
@@ -461,7 +481,7 @@ def show_val_accuracy( ram_inacc, swap_inacc, only_total, show_swap ):
             sys.exit(1)
 
 
-def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
+def get_memory_usage(pids_to_show, split_args, discriminate_by_pid, user,
                      include_self=False, only_self=False):
     cmds = {}
     shareds = {}
@@ -480,8 +500,14 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
             continue
         if pids_to_show and pid not in pids_to_show:
             continue
+#        if user and os.stat(proc.path(pid)).st_uid != os.geteuid():
+#            continue
+
 
         try:
+            if user and proc.stat(pid).st_uid != os.geteuid():
+                continue
+
             cmd = getCmdName(pid, split_args, discriminate_by_pid)
         except LookupError:
             #operation not permitted
@@ -569,9 +595,9 @@ def print_memory_usage(sorted_cmds, shareds, count, total, swaps, total_swap,
                          ("-" * 33, " " * 24, human(total), "=" * 33))
 
 
-def verify_environment(pids_to_show):
-    if os.geteuid() != 0 and not pids_to_show:
-        sys.stderr.write("Sorry, root permission required, or specify pids with -p\n")
+def verify_environment(pids_to_show, user):
+    if os.geteuid() != 0 and not (pids_to_show or user):
+        sys.stderr.write("Sorry, root permission required, or specify pids with -p, or user-mode with -u\n")
         sys.stderr.close()
         sys.exit(1)
 
@@ -593,9 +619,9 @@ def main():
     sys.stderr = Unbuffered(sys.stderr)
 
     split_args, pids_to_show, watch, only_total, discriminate_by_pid, \
-    show_swap = parse_options()
+    show_swap, user = parse_options()
 
-    verify_environment(pids_to_show)
+    verify_environment(pids_to_show, user)
 
     if not only_total:
         print_header(show_swap, discriminate_by_pid)
@@ -606,7 +632,7 @@ def main():
             while sorted_cmds:
                 sorted_cmds, shareds, count, total, swaps, total_swap = \
                     get_memory_usage(pids_to_show, split_args,
-                                     discriminate_by_pid)
+                                     discriminate_by_pid, user)
                 if only_total and show_swap and have_swap_pss:
                     sys.stdout.write(human(total_swap, units=1)+'\n')
                 elif only_total and not show_swap and have_pss:
@@ -625,7 +651,7 @@ def main():
         # This is the default behavior
         sorted_cmds, shareds, count, total, swaps, total_swap = \
             get_memory_usage(pids_to_show, split_args,
-                             discriminate_by_pid)
+                             discriminate_by_pid, user)
         if only_total and show_swap and have_swap_pss:
             sys.stdout.write(human(total_swap, units=1)+'\n')
         elif only_total and not show_swap and have_pss:
