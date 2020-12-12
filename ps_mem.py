@@ -234,6 +234,8 @@ def getMemStats(pid):
     mem_id = pid #unique
     Private_lines = []
     Shared_lines = []
+    Private_huge_lines = []
+    Shared_huge_lines = []
     Pss_lines = []
     Rss = (int(proc.open(pid, 'statm').readline().split()[1])
            * PAGESIZE)
@@ -251,7 +253,13 @@ def getMemStats(pid):
         # not always different for separate processes.
         mem_id = hash(''.join(lines))
         for line in lines:
-            if line.startswith("Shared"):
+            # {Private,Shared}_Hugetlb is not included in Pss (why?)
+            # so we need to account for separately.
+            if line.startswith("Private_Hugetlb:"):
+                Private_huge_lines.append(line)
+            elif line.startswith("Shared_Hugetlb:"):
+                Shared_huge_lines.append(line)
+            elif line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
                 Private_lines.append(line)
@@ -265,12 +273,15 @@ def getMemStats(pid):
                 Swap_pss_lines.append(line)
         Shared = sum([int(line.split()[1]) for line in Shared_lines])
         Private = sum([int(line.split()[1]) for line in Private_lines])
+        Shared_huge = sum([int(line.split()[1]) for line in Shared_huge_lines])
+        Private_huge = sum([int(line.split()[1]) for line in Private_huge_lines])
         #Note Shared + Private = Rss above
         #The Rss in smaps includes video card mem etc.
         if have_pss:
             pss_adjust = 0.5 # add 0.5KiB as this avg error due to truncation
             Pss = sum([float(line.split()[1])+pss_adjust for line in Pss_lines])
             Shared = Pss - Private
+        Private += Private_huge  # Add after as PSS doesn't a/c for huge pages
         if have_swap_pss:
             # The kernel supports SwapPss, that shows proportional swap share.
             # Note that Swap - SwapPss is not Private Swap.
@@ -280,12 +291,14 @@ def getMemStats(pid):
             Swap = sum([int(line.split()[1]) for line in Swap_lines])
     elif (2,6,1) <= kernel_ver() <= (2,6,9):
         Shared = 0 #lots of overestimation, but what can we do?
+        Shared_huge = 0
         Private = Rss
     else:
         Shared = int(proc.open(pid, 'statm').readline().split()[2])
         Shared *= PAGESIZE
+        Shared_huge = 0
         Private = Rss - Shared
-    return (Private, Shared, Swap, mem_id)
+    return (Private, Shared, Shared_huge, Swap, mem_id)
 
 
 def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
@@ -465,6 +478,7 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
                      include_self=False, only_self=False):
     cmds = {}
     shareds = {}
+    shared_huges = {}
     mem_ids = {}
     count = {}
     swaps = {}
@@ -490,7 +504,7 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
             continue
 
         try:
-            private, shared, swap, mem_id = getMemStats(pid)
+            private, shared, shared_huge, swap, mem_id = getMemStats(pid)
         except RuntimeError:
             continue #process gone
         if shareds.get(cmd):
@@ -500,6 +514,11 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
                 shareds[cmd] = shared
         else:
             shareds[cmd] = shared
+        if shared_huges.get(cmd):
+            if shared_huges[cmd] < shared_huge: #just take largest shared_huge
+                shared_huges[cmd] = shared_huge
+        else:
+            shared_huges[cmd] = shared_huge
         cmds[cmd] = cmds.setdefault(cmd, 0) + private
         if cmd in count:
             count[cmd] += 1
@@ -524,6 +543,8 @@ def get_memory_usage(pids_to_show, split_args, discriminate_by_pid,
             cmds[cmd] /= cmd_count
             if have_pss:
                 shareds[cmd] /= cmd_count
+        # overestimation possible if shared_huges shared across commands
+        shareds[cmd] += shared_huges[cmd]
         cmds[cmd] = cmds[cmd] + shareds[cmd]
         total += cmds[cmd]  # valid if PSS available
         total_swap += swaps[cmd]
