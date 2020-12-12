@@ -251,7 +251,11 @@ def getMemStats(pid):
         # not always different for separate processes.
         mem_id = hash(''.join(lines))
         for line in lines:
-            if line.startswith("Shared"):
+            if line.startswith("Private_Hugetlb"):
+                continue
+            elif line.startswith("Shared_Hugetlb"):
+                continue
+            elif line.startswith("Shared"):
                 Shared_lines.append(line)
             elif line.startswith("Private"):
                 Private_lines.append(line)
