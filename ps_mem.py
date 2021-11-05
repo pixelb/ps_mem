@@ -78,6 +78,7 @@ import errno
 import os
 import sys
 import time
+import io
 
 # The following exits cleanly on Ctrl-C or EPIPE
 # while treating other exceptions as before.
@@ -101,16 +102,15 @@ our_pid = os.getpid()
 have_pss = 0
 have_swap_pss = 0
 
-class Unbuffered(object):
+class Unbuffered(io.TextIOBase):
    def __init__(self, stream):
+       super().__init__()
        self.stream = stream
    def write(self, data):
        self.stream.write(data)
        self.stream.flush()
    def close(self):
        self.stream.close()
-   def flush(self):
-      self.stream.flush()
 
 class Proc:
     def __init__(self):
