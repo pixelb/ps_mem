@@ -104,7 +104,7 @@ have_swap_pss = 0
 
 class Unbuffered(io.TextIOBase):
    def __init__(self, stream):
-       super().__init__()
+       super(Unbuffered, self).__init__()
        self.stream = stream
    def write(self, data):
        self.stream.write(data)
