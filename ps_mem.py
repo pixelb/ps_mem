@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Try to determine how much RAM is currently being used per program.
 # Note per _program_, not per process. So for example this script
