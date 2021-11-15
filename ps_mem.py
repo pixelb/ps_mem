@@ -9,7 +9,7 @@
 
 # Licence: LGPLv2
 # Author:  P@draigBrady.com
-# Source:  http://www.pixelbeat.org/scripts/ps_mem.py
+# Source:  https://www.pixelbeat.org/scripts/ps_mem.py
 
 # V1.0      06 Jul 2005     Initial release
 # V1.1      11 Aug 2006     root permission required for accuracy
@@ -37,7 +37,7 @@
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
 # V3.13     17 Sep 2018
-#   http://github.com/pixelb/scripts/commits/master/scripts/ps_mem.py
+#   https://github.com/pixelb/ps_mem/commits/master/ps_mem.py
 
 # Notes:
 #
