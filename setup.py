@@ -9,7 +9,7 @@ def read(fname):
 
 setup(
     name="ps_mem",
-    version="3.13",
+    version="3.14",
     author="Pádraig Brady",
     author_email="P@draigBrady.com",
     description=("A utility to report core memory usage per program"),

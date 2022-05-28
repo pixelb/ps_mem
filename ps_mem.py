@@ -36,7 +36,7 @@
 #                           Patch from patrice.bouchand.fedora@gmail.com
 # V1.9      20 Feb 2008     Fix invalid values reported when PSS is available.
 #                           Reported by Andrey Borzenkov <arvidjaar@mail.ru>
-# V3.13     17 Sep 2018
+# V3.14     28 May 2022
 #   https://github.com/pixelb/ps_mem/commits/master/ps_mem.py
 
 # Notes:
@@ -149,7 +149,7 @@ proc = Proc()
 def parse_options():
     help_msg = 'Show program core memory usage.'
     parser = argparse.ArgumentParser(prog='ps_mem', description=help_msg)
-    parser.add_argument('--version', action='version', version='3.13')
+    parser.add_argument('--version', action='version', version='3.14')
     parser.add_argument(
         '-s', '--split-args',
         action='store_true',
