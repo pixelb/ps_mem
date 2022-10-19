@@ -301,7 +301,7 @@ def getMemStats(pid):
     return (Private, Shared, Shared_huge, Swap, mem_id)
 
 
-def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
+def getCmdName(pid, split_args, discriminate_by_pid):
     cmdline = proc.open(pid, 'cmdline').read().split("\0")
     while cmdline[-1] == '' and len(cmdline) > 1:
         cmdline = cmdline[:-1]
@@ -334,8 +334,8 @@ def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
                 path = cmdline[0] + " [updated]"
             else:
                 path += " [deleted]"
+
     exe = os.path.basename(path)
-    if exe_only: return exe
 
     proc_status = proc.open(pid, 'status').readlines()
     cmd = proc_status[0][6:-1]
@@ -356,17 +356,20 @@ def getCmdName(pid, split_args, discriminate_by_pid, exe_only=False):
                 break
         if ppid:
             try:
-                p_exe = getCmdName(ppid, False, False, exe_only=True)
+                p_exe = getCmdName(ppid, False, False)
             except LookupError:
                 pass
             else:
                 if exe == p_exe:
                     cmd = exe
+
     if sys.version_info >= (3,):
         cmd = cmd.encode(errors='replace').decode()
     if discriminate_by_pid:
         cmd = '%s [%d]' % (cmd, pid)
-    return cmd
+        return cmd
+    else:
+        return exe
 
 
 #The following matches "du -h" output
